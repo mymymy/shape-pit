@@ -1300,6 +1300,13 @@ function flutter(dt){
 /* ---------------------------------------------------------------- drawing */
 function draw(){
   ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
+  /* the speckle belongs to the ground, so it goes down with the ground and the
+     pieces are laid on top of it. Over the top of everything instead it read as
+     grain in a photograph of the pit rather than as the surface they are lying on,
+     and it crawled under them as they moved, being fixed to the screen while they
+     are not */
+  if (!grain) makeGrain();
+  for (let y=0;y<H;y+=256) for (let x=0;x<W;x+=256) ctx.drawImage(grain, x, y);
   ctx.lineWidth = lineW;
   ctx.lineJoin = 'round';
   const moat = lineW + 3;
@@ -1322,8 +1329,6 @@ function draw(){
     ctx.stroke(t.path);
     ctx.restore();
   }
-  if (!grain) makeGrain();
-  for (let y=0;y<H;y+=256) for (let x=0;x<W;x+=256) ctx.drawImage(grain, x, y);
   for (const b of bits){
     ctx.save();
     ctx.translate(b.x, b.y);
