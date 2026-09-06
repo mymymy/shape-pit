@@ -443,22 +443,36 @@ function inks(colours){
   }
 }
 
-/* One sheet of speckle over the whole picture rather than a pattern carried by
-   every piece. Filling each outline through a pattern is the single most expensive
-   thing the frame does — it halved the frame rate — and laid over everything at
-   once the grain reads as the paper this is printed on, which is truer anyway */
-let grain = null;
-function makeGrain(){
-  grain = document.createElement('canvas');
-  grain.width = grain.height = 256;
-  const g = grain.getContext('2d');
+/* Sheets of speckle laid over the picture rather than a pattern carried by every
+   piece. Filling each outline through a pattern is the single most expensive thing
+   the frame does — it halved the frame rate — where a sheet costs one blit a tile.
+
+   Two of them. The first goes down on the ground before any piece does, so it stays
+   the surface they are lying on rather than grain in a photograph of them. The
+   second goes over everything afterwards, which is what puts a little tooth on the
+   pieces themselves — much less of it than the ground carries, barely there.
+
+   Their strengths are chosen so the ground ends up exactly as speckled as it was
+   when it had one sheet to itself. Two grains laid over each other add as variances
+   rather than as amplitudes, so what the ground wants is √(24² + 10²) = 26, the
+   number it used to have on its own */
+const GRAIN_GROUND = 24, GRAIN_PIECES = 10;
+let grainLow = null, grainTop = null;
+function makeGrain(most){
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
   const img = g.createImageData(256,256), d = img.data;
   for (let i=0;i<d.length;i+=4){
     const v = Math.random() < .5 ? 0 : 255;
     d[i] = d[i+1] = d[i+2] = v;
-    d[i+3] = Math.random()*Math.random()*26;
+    d[i+3] = Math.random()*Math.random()*most;
   }
   g.putImageData(img,0,0);
+  return c;
+}
+function speckle(tile){
+  for (let y=0;y<H;y+=256) for (let x=0;x<W;x+=256) ctx.drawImage(tile, x, y);
 }
 
 function allocate(n){
@@ -1300,13 +1314,11 @@ function flutter(dt){
 /* ---------------------------------------------------------------- drawing */
 function draw(){
   ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
-  /* the speckle belongs to the ground, so it goes down with the ground and the
-     pieces are laid on top of it. Over the top of everything instead it read as
-     grain in a photograph of the pit rather than as the surface they are lying on,
-     and it crawled under them as they moved, being fixed to the screen while they
-     are not */
-  if (!grain) makeGrain();
-  for (let y=0;y<H;y+=256) for (let x=0;x<W;x+=256) ctx.drawImage(grain, x, y);
+  /* most of the speckle belongs to the ground, so it goes down with the ground and
+     the pieces are laid on top of it: over the top of everything instead it read as
+     grain in a photograph of the pit rather than as the surface they lie on */
+  if (!grainLow){ grainLow = makeGrain(GRAIN_GROUND); grainTop = makeGrain(GRAIN_PIECES); }
+  speckle(grainLow);
   ctx.lineWidth = lineW;
   ctx.lineJoin = 'round';
   const moat = lineW + 3;
@@ -1329,6 +1341,7 @@ function draw(){
     ctx.stroke(t.path);
     ctx.restore();
   }
+  speckle(grainTop);                         /* and a breath of it over the pieces */
   for (const b of bits){
     ctx.save();
     ctx.translate(b.x, b.y);
