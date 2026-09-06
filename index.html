@@ -52,6 +52,8 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 /* the controls live up in the empty air above the pile, where they cover
    nothing anyone has to count */
 .dock{display:flex;flex-direction:column;align-items:flex-end;gap:10px;margin-left:auto}
+/* the question and the answer, which move together and are the only things that do */
+.asker{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
 
 .card{
   pointer-events:auto;background:var(--panel);
@@ -70,7 +72,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
    always out of the way — so let whoever is counting decide */
 #guessCard,#resultCard{cursor:grab;touch-action:none}
 #guessCard input{cursor:auto}
-.dock.dragging #guessCard,.dock.dragging #resultCard{cursor:grabbing}
+.asker.dragging #guessCard,.asker.dragging #resultCard{cursor:grabbing}
 .grip{
   flex:0 0 auto;align-self:center;width:9px;height:15px;color:var(--dim);opacity:.5;
   background-image:radial-gradient(currentColor 1.1px,transparent 1.3px);
@@ -117,6 +119,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
     <div class="dock">
       <button class="ghost" id="skipBtn" hidden>Settle them now</button>
 
+      <div class="asker">
       <form class="card row" id="guessCard" hidden autocomplete="off">
         <span class="grip" aria-hidden="true" title="Drag to move"></span>
         <label for="guessInput">How many?</label>
@@ -130,6 +133,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
         <p class="detail" id="detail"></p>
         <p class="best" id="best"></p>
         <button class="primary" id="againBtn">Again</button>
+      </div>
       </div>
     </div>
   </div>
@@ -405,7 +409,7 @@ let pourT = 0, pourTime = 0, pourTo = 0, topAcc = 0, stuck = 0, fixed = false, c
     asked = false, busy = Infinity, deck = null, deckAt = 0;
 let holdOne = false, holdAt = -1, holdWait = 0;
 
-let dockX = 0, dockY = 0;                  /* where the cards have been dragged to */
+let askX = 0, askY = 0;                  /* where the cards have been dragged to */
 
 const el = id => document.getElementById(id);
 const statusEl = el('status'), startCard = el('startCard'), skipBtn = el('skipBtn'),
@@ -514,7 +518,7 @@ function roof(){
      same room at the top whatever anyone has done with the card, so how full a
      round comes out never depends on where it was last parked — and there is
      always that band of clear air to park it in */
-  return (r.height ? r.bottom - dockY : 96) + Math.max(14, SIZE*0.4);
+  return (r.height ? r.bottom - askY : 96) + Math.max(14, SIZE*0.4);
 }
 
 /* full enough: a couple of pieces of the heap itself standing above the line. What
@@ -1414,12 +1418,12 @@ function ask(){
   skipBtn.hidden = true;
   if (judged){                       /* the pit was only disturbed; the answer stands */
     resultCard.hidden = false;
-    settleDock();
+    settleAsker();
     setStatus('there were ' + N);
     return;
   }
   guessCard.hidden = false;
-  settleDock();
+  settleAsker();
   setStatus('count them');
   if (!matchMedia('(hover: none)').matches) guessInput.focus();
 }
@@ -1538,68 +1542,71 @@ function judge(guess){
     : pct < was.pct ? `A new best: ${pretty(pct)}, where it was ${pretty(was.pct)}.`
     : `Best so far: ${pretty(was.pct)}, out of ${was.n}.`;
   best.hidden = !best.textContent;           /* no empty line holding the card open */
-  settleDock();                              /* once it is the size it is going to be, */
+  settleAsker();                              /* once it is the size it is going to be, */
   if (err === 0) shower();                   /* and the confetti knows where to come from */
   el('againBtn').focus();
 }
 
-/* Both cards ride on the dock, so they are dragged as one and the answer comes up
-   where the question was left. Where it is put is remembered, and kept inside the
-   window when the window changes shape */
-const dock = document.querySelector('.dock');
+/* Both cards ride together, so the answer comes up where the question was left.
+   Where they are put is remembered, and kept inside the window when the window
+   changes shape. What does NOT ride with them is the button that settles the pit
+   early: it shares the corner but not the drag, and while it did, a question box
+   dragged down over the pieces put "settle them now" in the middle of the pit on
+   the round after */
+const asker = document.querySelector('.asker');
 let dragFrom = null, grabX = 0, grabY = 0, dragged = false, justDragged = false;
 
-function moveDock(nx, ny){
-  const r = dock.getBoundingClientRect();    /* as it stands, before the new offset */
-  const homeL = r.left - dockX, homeT = r.top - dockY, m = 8;
-  dockX = nx; dockY = ny;
+function moveAsker(nx, ny){
+  const r = asker.getBoundingClientRect();    /* as it stands, before the new offset */
+  const homeL = r.left - askX, homeT = r.top - askY, m = 8;
+  askX = nx; askY = ny;
   /* only worth keeping in view while there is something to see. With both cards
-     down the dock measures next to nothing, and a spot worked out against that is
+     down there is nothing here to measure, and a spot worked out against nothing is
      wrong by the size of a card once one comes back up */
   if (r.width > 20 && r.height > 20){
     const w = innerWidth, h = innerHeight;  /* the window as it is now, which on a
                                                resize is ahead of what the pit knows */
-    dockX = clamp(dockX, m - homeL, Math.max(m - homeL, w - m - r.width - homeL));
-    dockY = clamp(dockY, m - homeT, Math.max(m - homeT, h - m - r.height - homeT));
+    askX = clamp(askX, m - homeL, Math.max(m - homeL, w - m - r.width - homeL));
+    askY = clamp(askY, m - homeT, Math.max(m - homeT, h - m - r.height - homeT));
   }
-  dock.style.transform = dockX || dockY ? `translate(${dockX}px,${dockY}px)` : '';
+  asker.style.transform = askX || askY ? `translate(${askX}px,${askY}px)` : '';
 }
-const settleDock = () => moveDock(dockX, dockY);   /* a card is up: place it properly */
+const settleAsker = () => moveAsker(askX, askY);   /* a card is up: place it properly */
 
 try {
   const kept = JSON.parse(localStorage.getItem('shapepit.dock') || 'null');
-  if (kept && isFinite(kept.x) && isFinite(kept.y)) moveDock(kept.x, kept.y);
+  if (kept && isFinite(kept.x) && isFinite(kept.y)) moveAsker(kept.x, kept.y);
 } catch (e) {}
 
-dock.addEventListener('pointerdown', e => {
+asker.addEventListener('pointerdown', e => {
   if (e.button > 0 || e.target.closest('button, input')) return;   /* the controls
                                                                       still answer */
   dragFrom = e.pointerId;
   dragged = false;
-  grabX = e.clientX - dockX; grabY = e.clientY - dockY;
-  dock.classList.add('dragging');
+  grabX = e.clientX - askX; grabY = e.clientY - askY;
+  asker.classList.add('dragging');
 });
 addEventListener('pointermove', e => {
   if (e.pointerId !== dragFrom) return;
-  if (!dragged && Math.abs(e.clientX-grabX-dockX) + Math.abs(e.clientY-grabY-dockY) < 4) return;
+  if (!dragged && Math.abs(e.clientX-grabX-askX) + Math.abs(e.clientY-grabY-askY) < 4) return;
   dragged = true;                            /* a tap on the label still reaches it */
   e.preventDefault();
-  moveDock(e.clientX - grabX, e.clientY - grabY);
+  moveAsker(e.clientX - grabX, e.clientY - grabY);
 });
 const drop = e => {
   if (e.pointerId !== dragFrom) return;
   dragFrom = null;
-  dock.classList.remove('dragging');
+  asker.classList.remove('dragging');
   if (!dragged) return;
   /* swallow the click that follows letting go, and only that one: left standing, the
      flag would eat the next real press of the button instead */
   justDragged = true;
   setTimeout(() => { justDragged = false; }, 0);
-  try { localStorage.setItem('shapepit.dock', JSON.stringify({ x: dockX, y: dockY })); } catch (err) {}
+  try { localStorage.setItem('shapepit.dock', JSON.stringify({ x: askX, y: askY })); } catch (err) {}
 };
 addEventListener('pointerup', drop);
 addEventListener('pointercancel', drop);
-dock.addEventListener('click', e => {
+asker.addEventListener('click', e => {
   if (justDragged){ e.preventDefault(); e.stopPropagation(); }
 }, true);
 
@@ -1626,11 +1633,11 @@ let resizeTimer = 0;
 addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   needsDraw = true;
-  settleDock();                              /* the cards move with it, not after it */
+  settleAsker();                              /* the cards move with it, not after it */
   resizeTimer = setTimeout(() => {
     const oldW = W, oldH = H;
     fit();
-    settleDock();
+    settleAsker();
     if (phase === 'idle') return;
     if (Math.abs(W-oldW) < 2 && Math.abs(H-oldH) < 2) return;
     const small = W === oldW && Math.abs(H-oldH) < oldH*0.15;
