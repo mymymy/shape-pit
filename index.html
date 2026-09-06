@@ -360,6 +360,21 @@ const DRAG_SPIN  = 0.90;   /* and against turning */
 const DRAG_REST  = 1.20;   /* the pit itself, once the pouring has stopped */
 const STILL      = 0.8;    /* piece-widths a second: below this nothing is going anywhere */
 const HOLD       = 0.2;    /* seconds of that before the box goes up */
+/* A piece that has come to rest on something and stayed there stops being simulated:
+   no gravity, no outline rebuilt, no contact worked out against its sleeping
+   neighbours, no place in the solver. In a heap of six hundred that is nearly all of
+   them nearly all of the time, and it is the difference between thirteen frames a
+   second at the end of a heavy round and sixty.
+
+   What makes it safe rather than merely fast is that waking is generous and stopping
+   is not: any contact with something awake wakes it at once, whatever moves a piece
+   by hand wakes everything that piece was leaning on, and the pass that pushes the
+   last of the overlap out when the pit stops wakes the whole pit before it runs. A
+   piece may only sleep while it is actually resting on something — never in mid-air,
+   whatever the number below says about how slowly it is going */
+const SLEEP_SPEED = 0.7;   /* piece-widths a second: under this it is going nowhere, */
+const SLEEP_TIME  = 0.20;  /* and after this long of that it stops being simulated */
+
 const TAIL       = 8;      /* under this the pit is only shuffling, */
 const TAIL_SPEED = 3;      /* so play that part out at up to triple time, */
 const TAIL_EASE  = 0.3;    /* eased over this many seconds rather than switched, */
@@ -388,7 +403,8 @@ let W = 0, H = 0, dpr = 1, bg = null, ground = [];
 let N = 0, live = 0, SIZE = 20;            /* SIZE: the radius a piece would have as a disc */
 let bx, by, ba, vx, vy, va, pvx, pvy, pva, sx, sy, sa, tpl, col;
 let invM, invI, bound;
-let TPL = [], rims = [], flats = [], lineW = 1, resting = null;
+let TPL = [], rims = [], flats = [], lineW = 1, resting = null, asleep = null, stillFor = null,
+    moveRate = null;
 
 /* world outlines, rebuilt every substep */
 let wv, wn, wcount;
@@ -399,7 +415,7 @@ let forced = null;      /* ?debug may pin a round's shape, to test one kind at a
 
 /* contacts found by the position pass, replayed by the velocity pass */
 let cA, cB, cnx, cny, crax, cray, crbx, crby, cdep, cwn, cwt, cjn, cjt, ctar, cpn, ckey, cfeat,
-    keyId, keyjn, keyjt, keyFeat, keyAge, hMask = 0, cslot, ccy, order, bucket,
+    keyId, keyjn, keyjt, keyFeat, keyAge, hMask = 0, cslot, cstat, ccy, order, bucket,
     nc = 0, maxC = 0, tick = 0;
 
 let G = 0, vmax = 0, wmax = 0, bounceMin = 0, damp = DRAG, maxBound = 0;
@@ -484,7 +500,8 @@ function allocate(n){
   bx=f(); by=f(); ba=f(); vx=f(); vy=f(); va=f(); pvx=f(); pvy=f(); pva=f(); sx=f(); sy=f(); sa=f();
   invM=f(); invI=f(); bound=f();
   tpl = new Uint8Array(n); col = new Uint8Array(n); wcount = new Uint8Array(n);
-  resting = new Uint8Array(n);
+  resting = new Uint8Array(n); asleep = new Uint8Array(n); stillFor = new Float32Array(n);
+  moveRate = new Float32Array(n);
   wv = new Float32Array(n*MAXV*2); wn = new Float32Array(n*MAXV*2);
   maxC = n*16 + 256;         /* room enough that nothing is ever dropped */
   cA = new Int32Array(maxC); cB = new Int32Array(maxC);
@@ -496,6 +513,7 @@ function allocate(n){
   cpn = new Float32Array(maxC); ckey = new Int32Array(maxC); cfeat = new Int32Array(maxC);
   ccy = new Float32Array(maxC); order = new Int32Array(maxC); bucket = new Int32Array(BINS+1);
   cslot = new Int32Array(maxC);
+  cstat = new Uint8Array(maxC);
   hashRoom(maxC);
   keyId.fill(0); keyAge.fill(-9);             /* last round's pushes belong to last
                                                  round's pieces */
@@ -553,9 +571,9 @@ function brimming(){
   const line = ceil + SIZE + (air*meanA/packWas)/W;
   let n = 0;
   for (let i=0;i<live;i++){
-    if (!resting[i] || Math.hypot(vx[i],vy[i]) > SIZE*5) continue;   /* two pieces meeting
-                                                                       in mid-air are not
-                                                                       the heap either */
+    /* asleep counts as resting: a sleeper works out no contacts, so nothing sets the
+       flag for it, and the settled heap is precisely what is asleep */
+    if (!(resting[i] || asleep[i]) || Math.hypot(vx[i],vy[i]) > SIZE*5) continue;
     if (by[i] - bound[i] < 0) continue;      /* nor is anything still over the top edge */
     if (by[i] - bound[i] < line && ++n > 1) return true;
   }
@@ -616,6 +634,7 @@ function newRound(){
   n = Math.max(12, n);                       /* and no ceiling over it */
   const room = Math.round(n*3.2) + 16;       /* room for the pour to overrun into */
 
+  stir = SIZE*SLEEP_SPEED; shove = SIZE*6;   /* what counts as going somewhere */
   G = G_PER_PX * SIZE;
   /* how fast a piece may fall. A landing the solver cannot stop within one step used
      to be the trigger for almost every jam, and the crowded rounds had to fall
@@ -651,6 +670,7 @@ function pour(again){
   fixed = !!again;
   live = 0; deckAt = 0; pourT = 0; stuck = 0; calm = 0; simTime = 0; damp = DRAG; busy = Infinity;
   rescues = 0; lifts = 0; jamKey = -1; jamFor = 0; jamC = -1;
+  if (asleep){ asleep.fill(0); stillFor.fill(0); }
   tailRate = 1; tailAcc = 0;
   asked = false;
   pourTime = Math.min(POUR_MAX, Math.max(POUR_MIN, N/POUR_RATE));
@@ -706,6 +726,8 @@ function unjam(force){
   const i = by[cA[k]] < by[cB[k]] ? cA[k] : cB[k], b = bound[i];
   const lo = Math.min(b*1.1, W/2), hi = Math.max(W - b*1.1, W/2);
   const wasX = bx[i];                        /* a try that did not come off moves it */
+  wakeAround(i);                             /* before it goes, or what it was holding
+                                                up never hears about it */
   const drop = (px, py) => {
     bx[i]=px; by[i]=py; ba[i]=Math.random()*6.2832;
     vx[i]=0; vy[i]=Math.sqrt(G*SIZE)*.2; va[i]=(Math.random()-.5)*3;
@@ -766,6 +788,8 @@ function spawnOne(){
        pixels inside another is not something the solver can talk its way out of */
     if (!fits(live, px, py, Math.random()*6.2832)) continue;
     const u = Math.sqrt(G*SIZE);
+    asleep[live]=0; stillFor[live]=0; moveRate[live]=Infinity;   /* it has only just
+                                                    been let go: it wakes what it lands on */
     vx[live]=(Math.random()-.5)*u*.35; vy[live]=u*.2; va[live]=(Math.random()-.5)*4;
     col[live]=deck[deckAt++];
     live++;
@@ -775,8 +799,30 @@ function spawnOne(){
 }
 
 /* ----------------------------------------------------------------- solver */
+function wake(i){ asleep[i] = 0; stillFor[i] = 0; moveRate[i] = 0; }
+
+/* is this piece actually going somewhere? Out here rather than inside the contact,
+   which is asked a million times a second and cannot afford to build a function to
+   answer it each time */
+let stir = 0, shove = 0;
+function going(j){
+  return moveRate[j] > stir ||
+         Math.hypot(vx[j],vy[j]) + Math.abs(va[j])*bound[j] > shove;
+}
+
+/* and everything the piece was leaning on, for when it is moved by hand rather than
+   by the solver: the contact that would have woken them goes with it */
+function wakeAround(i){
+  wake(i);
+  for (let c=0;c<nc;c++){
+    if (cA[c] === i && cB[c] >= 0) wake(cB[c]);
+    else if (cB[c] === i && cA[c] >= 0) wake(cA[c]);
+  }
+}
+
 function outlines(){
   for (let i=0;i<live;i++){
+    if (asleep[i]) continue;                 /* it has not moved, so nor has its outline */
     const t = TPL[tpl[i]], c = Math.cos(ba[i]), s = Math.sin(ba[i]);
     const o = i*MAXV*2, x = bx[i], y = by[i];
     for (let k=0;k<t.count;k++){
@@ -879,7 +925,7 @@ function roomFor(need){
   const f = () => new Float32Array(maxC), n = () => new Int32Array(maxC);
   cA = n(); cB = n(); cnx = f(); cny = f(); crax = f(); cray = f(); crbx = f(); crby = f();
   cdep = f(); cwn = f(); cwt = f(); cjn = f(); cjt = f(); ctar = f(); cpn = f();
-  ckey = n(); cfeat = n(); ccy = f(); order = n(); cslot = n();
+  ckey = n(); cfeat = n(); ccy = f(); order = n(); cslot = n(); cstat = new Uint8Array(maxC);
   hashRoom(maxC);
 }
 
@@ -988,8 +1034,30 @@ function record(A, B, nx, ny, px, py, depth, key, feat){
   if (nc >= maxC) return;
   const rax = A < 0 ? 0 : px-bx[A], ray = A < 0 ? 0 : py-by[A];
   const rbx = B < 0 ? 0 : px-bx[B], rby = B < 0 ? 0 : py-by[B];
-  const imA = A < 0 ? 0 : invM[A], iiA = A < 0 ? 0 : invI[A];
-  const imB = B < 0 ? 0 : invM[B], iiB = B < 0 ? 0 : invI[B];
+
+  /* Waking comes first, before anything is weighed. Whatever is touching something
+     that is actually going somewhere is awake from this moment — the piece holding it
+     up may be about to move out from under it, and only a piece that is moving can do
+     that. Judged on where a neighbour has got to rather than how fast it says it is
+     going: on speed, every neighbour in a settled heap reads as moving, since that
+     jitter is what this is all built to see past. Speed still gets a glance, for
+     something that has only just started to fall and has not been anywhere yet.
+
+     It has to happen here and not below, because what a contact weighs depends on it:
+     a sleeper weighs what a wall weighs, and a contact worked out against a sleeper
+     and then solved against the same piece awake divides by far too little and throws
+     it across the pit */
+  if (A >= 0) resting[A] = 1;
+  if (B >= 0) resting[B] = 1;
+  if (A >= 0 && B >= 0){
+    if (asleep[A] && !asleep[B] && going(B)) wake(A);
+    else if (asleep[B] && !asleep[A] && going(A)) wake(B);
+  }
+
+  /* a sleeper weighs what a wall weighs. It is not going to move for this contact,
+     and giving it speed it will never spend leaves it to jump when it does wake */
+  const imA = A < 0 || asleep[A] ? 0 : invM[A], iiA = A < 0 || asleep[A] ? 0 : invI[A];
+  const imB = B < 0 || asleep[B] ? 0 : invM[B], iiB = B < 0 || asleep[B] ? 0 : invI[B];
   const ca = rax*ny - ray*nx, cb = rbx*ny - rby*nx;
   const w = imA + iiA*ca*ca + imB + iiB*cb*cb;
   if (w <= 0) return;
@@ -1001,9 +1069,15 @@ function record(A, B, nx, ny, px, py, depth, key, feat){
   cA[nc]=A; cB[nc]=B; cnx[nc]=nx; cny[nc]=ny;
   crax[nc]=rax; cray[nc]=ray; crbx[nc]=rbx; crby[nc]=rby;
   cdep[nc]=depth; cwn[nc]=w; ccy[nc]=py;
+  /* which of the two this contact was weighed against as immovable. The solver has to
+     use the same answer: a later contact may wake one of them, and dividing an impulse
+     by a weight that assumed it was a wall throws it across the pit */
+  cstat[nc] = (imA === 0 ? 1 : 0) | (imB === 0 ? 2 : 0);
   cwt[nc]=imA + iiA*ta*ta + imB + iiB*tb*tb;
-  if (A >= 0) resting[A] = 1;
-  if (B >= 0) resting[B] = 1;
+  /* whatever is touching something that is actually going somewhere is woken: the
+     piece holding it up may be about to move out from under it, and only a piece
+     that is moving can do that. Waking for any awake neighbour instead, however
+     still, sends a wave of waking and re-sleeping round a settled heap for ever */
   ckey[nc]=key; cpn[nc]=0;
   ctar[nc] = vn < -bounceMin ? -REST*vn : 0;
 
@@ -1028,6 +1102,7 @@ function record(A, B, nx, ny, px, py, depth, key, feat){
    piece lie down on the floor instead of rocking on a point */
 function walls(){
   for (let i=0;i<live;i++){
+    if (asleep[i]) continue;                 /* nor has its corner crossed a wall */
     const o = i*MAXV*2, n = wcount[i];
     for (let k=0;k<n;k++){
       const px = wv[o+k*2], py = wv[o+k*2+1];
@@ -1079,8 +1154,10 @@ function solve(h){
       const k = order[oi];
       const A = cA[k], B = cB[k], nx = cnx[k], ny = cny[k];
       const rax = crax[k], ray = cray[k], rbx = crbx[k], rby = crby[k];
-      const imA = A < 0 ? 0 : invM[A], iiA = A < 0 ? 0 : invI[A];
-      const imB = B < 0 ? 0 : invM[B], iiB = B < 0 ? 0 : invI[B];
+      const st = cstat[k];                   /* as it was weighed, not as it is now */
+      const sA = (st & 1) !== 0, sB = (st & 2) !== 0;
+      const imA = sA ? 0 : invM[A], iiA = sA ? 0 : invI[A];
+      const imB = sB ? 0 : invM[B], iiB = sB ? 0 : invI[B];
       const ca = rax*ny - ray*nx, cb = rbx*ny - rby*nx;
 
       let vax = A < 0 ? 0 : vx[A] - va[A]*ray, vay = A < 0 ? 0 : vy[A] + va[A]*rax;
@@ -1135,6 +1212,9 @@ function solve(h){
    push properly: the contacts are rebuilt, and between each rebuild the push is
    iterated until the pieces have agreed on where they all go */
 function separate(){
+  /* the whole pit, awake, whatever it was doing: this is the pass that guarantees no
+     two pieces share a pixel, and it cannot make that good for a piece it skips */
+  asleep.fill(0); stillFor.fill(0);
   keyAge.fill(-9);                           /* nothing carried into a still pit */
   const until = performance.now() + 500;     /* a one-off, on a pit about to stop */
   for (let pass=0; pass<30 && performance.now() < until; pass++){
@@ -1222,6 +1302,7 @@ function step(dt){
   tick++;
   for (let s=0;s<SUB;s++){
     for (let i=0;i<live;i++){
+      if (asleep[i]) continue;               /* no gravity for what is already down */
       vy[i] = (vy[i] + gh)*dl; vx[i] *= dl; va[i] *= dA;
       if (creep && Math.hypot(vx[i],vy[i]) + Math.abs(va[i])*bound[i] < slow){
         const c = Math.max(0, 1 - 38.3*h);   /* per second, so that changing how many
@@ -1240,7 +1321,13 @@ function step(dt){
     walls();                                 /* before the pieces, never after: the
                                                 contact list has an end, and the floor
                                                 must never be what falls off it */
-    for (let k=0;k<np;k++) manifold(pairA[k], pairB[k]);
+    /* two sleepers cannot have moved relative to one another, so whatever was
+       between them still is, and working it out again would find the same thing */
+    for (let k=0;k<np;k++){
+      const a = pairA[k], b = pairB[k];
+      if (asleep[a] && asleep[b]) continue;
+      manifold(a, b);
+    }
     sortContacts();
     solve(h);
     for (let k=0;k<nc;k++){
@@ -1249,6 +1336,7 @@ function step(dt){
       keyjn[at] = cjn[k]; keyjt[at] = cjt[k]; keyFeat[at] = cfeat[k]; keyAge[at] = tick;
     }
     for (let i=0;i<live;i++){
+      if (asleep[i]) continue;
       bx[i]+=(vx[i]+pvx[i])*h; by[i]+=(vy[i]+pvy[i])*h; ba[i]+=(va[i]+pva[i])*h;
     }
   }
@@ -1267,10 +1355,23 @@ function travelled(){
   const span = simTime - snapAt;
   if (snapAt < 0 || live === 0){ snap(); return Infinity; }
   if (span < 0.18) return busy;
+  const stop = SIZE*SLEEP_SPEED*span;
   let m = 0;
   for (let i=0;i<live;i++){
     const d = Math.hypot(bx[i]-sx[i], by[i]-sy[i]) + Math.abs(ba[i]-sa[i])*bound[i];
     if (d > m) m = d;
+    /* and the same question of each piece on its own, since this is what decides
+       which of them stop being simulated. It has to be asked of where they have got
+       to and not of how fast they are going: a settled heap reads as still by the
+       one and busy by the other, every piece of it jittering in place against its
+       neighbours while going nowhere at all — which is why the pit is judged this
+       way too, and why a test on speed put not one piece of eight hundred to sleep */
+    if (asleep[i]) continue;
+    moveRate[i] = d/span;                    /* how far it is actually getting */
+    if (resting[i] && d < stop){
+      stillFor[i] += span;
+      if (stillFor[i] > SLEEP_TIME){ asleep[i] = 1; vx[i]=0; vy[i]=0; va[i]=0; }
+    } else stillFor[i] = 0;
   }
   snap();
   return m/span;
@@ -1387,6 +1488,8 @@ function advance(dt){
     step(dt);
     jamWatch(dt);
     unjam();
+    travelled();                             /* which of them have stopped, while the
+                                                rest of the round is still coming down */
     const full = !fixed && (live >= most || stuck > 1.5 || (live > 3 && brimming()));
     if (full || (fixed && live >= pourTo) || live >= cap){
       if (!fixed){
