@@ -340,8 +340,8 @@ function template(kind, area, skin){
 
 /* ------------------------------------------------------------- the world */
 const G_PER_PX   = 280;    /* gravity, px/s² per px of size: a piece is 7cm across */
-const SUB        = 20;     /* substeps a frame, */
-const ITER       = 3;      /* and passes over the contacts within each. The split
+const SUB        = 10;     /* substeps a frame, */
+const ITER       = 8;      /* and passes over the contacts within each. The split
                               between the two is what decides how far the pieces at
                               the bottom of a deep pit end up inside one another, and
                               it is not close: for the same work, twenty short steps
