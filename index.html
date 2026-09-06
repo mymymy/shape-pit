@@ -361,7 +361,10 @@ const DRAG_REST  = 1.20;   /* the pit itself, once the pouring has stopped */
 const STILL      = 0.8;    /* piece-widths a second: below this nothing is going anywhere */
 const HOLD       = 0.2;    /* seconds of that before the box goes up */
 const TAIL       = 8;      /* under this the pit is only shuffling, */
-const TAIL_SPEED = 3;      /* so play that part out at triple time */
+const TAIL_SPEED = 3;      /* so play that part out at up to triple time, */
+const TAIL_EASE  = 0.3;    /* eased over this many seconds rather than switched, */
+const STEP       = 1/60;   /* in steps of this, however many of them a frame gets */
+const TAIL_MOST  = 4;      /* and no more than this many, or a slow frame spirals */
 const DEAD       = 0.35;   /* and it is properly at rest under this */
 const LAST       = 1.2;    /* seconds it may take to get there */
 const POUR_RATE  = 45;     /* pieces a second, enough of them in the air to read as rain */
@@ -648,6 +651,7 @@ function pour(again){
   fixed = !!again;
   live = 0; deckAt = 0; pourT = 0; stuck = 0; calm = 0; simTime = 0; damp = DRAG; busy = Infinity;
   rescues = 0; lifts = 0; jamKey = -1; jamFor = 0; jamC = -1;
+  tailRate = 1; tailAcc = 0;
   asked = false;
   pourTime = Math.min(POUR_MAX, Math.max(POUR_MIN, N/POUR_RATE));
   holdOne = N > 3 && Math.random() < HOLD_BACK;
@@ -1473,7 +1477,7 @@ function rest(){
   needsDraw = true;
 }
 
-let last = 0, hurry = false, needsDraw = true;
+let last = 0, hurry = false, needsDraw = true, tailRate = 1, tailAcc = 0;
 function frame(now){
   requestAnimationFrame(frame);
   const dt = Math.min(1/30, last ? (now-last)/1000 : 1/60);
@@ -1492,13 +1496,35 @@ function frame(now){
                                                  is slower than simply watching */
       do { advance(1/60); }
       while ((phase === 'dropping' || phase === 'settling') && performance.now() < until);
-    } else if (phase === 'settling' && !asked && busy < SIZE*TAIL){
-      /* what is left is a slow shuffle into the hollows. Damping it away would
-         freeze the pile half-packed, so run the same motion at triple time
-         instead — the pit lands where it would have, sooner */
-      for (let k=0; k<TAIL_SPEED && phase === 'settling'; k++) advance(1/60);
     } else {
-      advance(dt);
+      /* What is left at the end is a slow shuffle into the hollows. Damping it away
+         would freeze the pile half-packed, so the same motion is run faster instead
+         and the pit lands where it would have, sooner.
+
+         How much faster follows how quiet it has gone, and is eased towards rather
+         than switched on. It used to be a plain threshold — triple time below it,
+         ordinary time above — and the measure of quiet wanders across a line like
+         that rather than crossing it once: the speed of everything changed threefold
+         several times a round, which is not a pile settling, it is time jumping.
+
+         The steps themselves are a fixed sixtieth either way, so what changes is how
+         many of them a frame gets, never how big they are. At the resting rate that
+         comes to exactly the dt the frame was given, which is what it used to be */
+      let want = 1;
+      if (phase === 'settling' && !asked){
+        /* full speed well before the pit is dead, so the tail is played out as
+           briskly as it was when this was a threshold — the easing below is what
+           keeps it from being felt, not a gentle ramp */
+        const q = busy/(SIZE*TAIL);          /* 1 at the old threshold, 0 dead still */
+        want = clamp(1 + (TAIL_SPEED-1)*(1.15 - q)/0.45, 1, TAIL_SPEED);
+      }
+      tailRate += (want - tailRate)*(1 - Math.exp(-dt/TAIL_EASE));
+      tailAcc += tailRate*dt/STEP;
+      let steps = 0;
+      while (tailAcc >= 1 && steps < TAIL_MOST && (phase === 'dropping' || phase === 'settling')){
+        advance(STEP); tailAcc -= 1; steps++;
+      }
+      if (tailAcc > 2) tailAcc = 2;          /* never a debt worth catching up on */
     }
   }
   draw();
