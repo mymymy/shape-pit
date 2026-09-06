@@ -31,6 +31,15 @@ of eight passes rather than a few long ones, and the contacts are solved from th
 floor upwards, so what holds the bottom up reaches the top in one pass instead of
 one level per pass.
 
+The picture is drawn between the steps rather than on them. The physics runs in
+fixed sixtieths of a second and a frame takes as many of those as it can afford, so
+on a full pit a frame is worth two of them, or one, or four; drawn on the steps, the
+pieces arrive unevenly and the pit appears to speed up and slow down as the frames
+get cheaper. Drawn part way between where a piece was and where it is, by how far
+into the next step the frame has got, what is on screen follows real time instead —
+which takes the frames where the pit's apparent speed jumps by a quarter or more
+from one in five to one in sixteen.
+
 Most of a full pit is doing nothing, and is charged for accordingly: a piece that
 has stopped moving stops being simulated, and one that has stopped moving under two
 cells of heap is buried — it is not woken by its neighbours at all. That last part

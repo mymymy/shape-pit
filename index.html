@@ -380,15 +380,41 @@ const SLEEP_TIME  = 0.20;  /* and after this long of that it stops being simulat
    is one connected thing: the pit liquefies and falls asleep again twice a second,
    and the sleeping buys nothing. It was worth a sixth; buried, it is worth a third of
    the round */
+/* What is still moving once the pit is down to a shuffle is its surface, and the
+   surface cannot be frozen — see below — so the shuffle is damped out of it instead.
+   Six times the width and better than twice the pull it had: under half a piece-width
+   a second the buzz was simply left alone. The worry with going harder is freezing a
+   heap half packed, and that does not show up — the pit still fills to between four
+   fifths and all of the room there is, and what it drops when it is woken and run on
+   is where it was. The drag takes out what the solver has not converged rather than
+   holding any piece up */
+const CREEP_UNDER = 3;     /* piece-widths a second under which a piece is only buzzing, */
+const CREEP_RATE  = 90;    /* and how hard that is pulled out of it, per second */
 const BURY_DEEP   = 2;     /* cells of the broad phase, each about one large piece */
 const BURY_LOAD   = 0.14;  /* and how far into it a piece may be pressed before it is
                               woken anyway, however deep it is buried */
+/* Freezing the surface as well — on how long a piece had been down rather than on
+   what was over it — was tried and does not work, even held back until the pour has
+   stopped and the pit has gone quiet. The top of the heap is the part still packing
+   down, so a piece frozen there is holding up a stack that has not finished
+   settling, and the pit keeps a pose it is not standing in. Woken and run on, a
+   two-and-a-half-thousand-piece round dropped more than half its pieces by over two
+   of their own widths, against a fifth of them without it. So the surface stays in
+   the simulation, and what it buzzes is damped rather than frozen */
 
 const TAIL       = 8;      /* under this the pit is only shuffling, */
 const TAIL_SPEED = 3;      /* so play that part out at up to triple time, */
 const TAIL_EASE  = 0.3;    /* eased over this many seconds rather than switched, */
 const STEP       = 1/60;   /* in steps of this, however many of them a frame gets */
 const TAIL_MOST  = 4;      /* and no more than this many, or a slow frame spirals */
+/* How many of them a frame takes is chosen by what they are costing, not by the
+   clock. A fixed number stutters: a frame that cost fifty milliseconds and one that
+   cost a hundred and thirty both moved the pit the same distance, so the pieces
+   arrive unevenly however smooth the motion underneath is. Sized against a budget
+   instead, the frames come out about as long as each other and the pit slows down
+   evenly when the machine cannot keep up */
+const FRAME_AIM  = 70;     /* ms a frame is meant to cost */
+const COST_EASE  = 0.25;   /* seconds over which what a step costs is eased */
 const DEAD       = 0.35;   /* and it is properly at rest under this */
 const LAST       = 1.2;    /* seconds it may take to get there */
 const POUR_RATE  = 45;     /* pieces a second, enough of them in the air to read as rain */
@@ -411,6 +437,7 @@ let W = 0, H = 0, dpr = 1, bg = null, ground = [];
 
 let N = 0, live = 0, SIZE = 20;            /* SIZE: the radius a piece would have as a disc */
 let bx, by, ba, vx, vy, va, pvx, pvy, pva, sx, sy, sa, tpl, col;
+let ox, oy, oa;           /* and where they were one step back, for the drawing */
 let invM, invI, bound;
 let TPL = [], rims = [], flats = [], lineW = 1, resting = null, asleep = null, stillFor = null,
     moveRate = null, buried = null, surface = null;
@@ -511,6 +538,7 @@ function allocate(n){
   tpl = new Uint8Array(n); col = new Uint8Array(n); wcount = new Uint8Array(n);
   resting = new Uint8Array(n); asleep = new Uint8Array(n); stillFor = new Float32Array(n);
   buried = new Uint8Array(n);
+  ox=f(); oy=f(); oa=f();
   moveRate = new Float32Array(n);
   wv = new Float32Array(n*MAXV*2); wn = new Float32Array(n*MAXV*2);
   maxC = n*16 + 256;         /* room enough that nothing is ever dropped */
@@ -682,7 +710,7 @@ function pour(again){
   live = 0; deckAt = 0; pourT = 0; stuck = 0; calm = 0; simTime = 0; damp = DRAG; busy = Infinity;
   rescues = 0; lifts = 0; jamKey = -1; jamFor = 0; jamC = -1;
   if (asleep){ asleep.fill(0); stillFor.fill(0); buried.fill(0); }
-  tailRate = 1; tailAcc = 0;
+  tailRate = 1; tailAcc = 0; stepCost = 4; alpha = 1;
   asked = false;
   pourTime = Math.min(POUR_MAX, Math.max(POUR_MIN, N/POUR_RATE));
   holdOne = N > 3 && Math.random() < HOLD_BACK;
@@ -1339,7 +1367,7 @@ function separate(){
 
 function step(dt){
   const h = dt/SUB, dl = Math.max(0, 1 - damp*h), dA = Math.max(0, 1 - (damp+DRAG_SPIN)*h);
-  const gh = G*h, creep = damp === DRAG_REST, slow = SIZE*0.5;
+  const gh = G*h, creep = damp === DRAG_REST, slow = SIZE*CREEP_UNDER;
   resting.fill(0);
   /* the pushes carry across substeps and across frames, which is what lets a deep
      heap hold itself up in a handful of passes. Each is picked up again only where
@@ -1352,7 +1380,7 @@ function step(dt){
       if (asleep[i]) continue;               /* no gravity for what is already down */
       vy[i] = (vy[i] + gh)*dl; vx[i] *= dl; va[i] *= dA;
       if (creep && Math.hypot(vx[i],vy[i]) + Math.abs(va[i])*bound[i] < slow){
-        const c = Math.max(0, 1 - 38.3*h);   /* per second, so that changing how many
+        const c = Math.max(0, 1 - CREEP_RATE*h);   /* per second, so that changing how many
                                                 substeps there are does not change how
                                                 quickly the last of the shuffling dies */
         vx[i] *= c; vy[i] *= c; va[i] *= c;
@@ -1465,12 +1493,12 @@ function flutter(dt){
 }
 
 /* ---------------------------------------------------------------- drawing */
-/* one piece, on whatever surface is being drawn */
-function lay(g, i, moat){
+/* one piece, at the place the frame has worked out for it */
+function lay(g, i, moat, x, y, a){
   const t = TPL[tpl[i]];
   g.save();
-  g.translate(bx[i], by[i]);
-  g.rotate(ba[i]);
+  g.translate(x, y);
+  g.rotate(a);
   /* cut a little ground round this piece before laying it down, so that whatever
      was drawn before it cannot share a pixel with it however the two are sitting */
   g.lineWidth = moat;
@@ -1495,9 +1523,21 @@ function draw(){
   ctx.lineWidth = lineW;
   ctx.lineJoin = 'round';
   ctx.fillStyle = flats[0];
+  /* drawn part way between where each piece was a step ago and where it is now.
+     A piece put somewhere by hand rather than by the solver — lifted out of a jam,
+     tipped back in after the window changed — has no business being drawn sliding
+     there, and no piece can cover three of its own widths in a step under its own
+     steam, so anything that has is drawn where it now is */
+  const near = SIZE*3, near2 = near*near;
   for (let i=0;i<live;i++){
     if (by[i] + bound[i] < 0) continue;
-    lay(ctx, i, moat);
+    let x = bx[i], y = by[i], a = ba[i];
+    if (alpha < 1){
+      const dx = x-ox[i], dy = y-oy[i], da = a-oa[i];
+      if (dx*dx + dy*dy < near2){ x = ox[i] + dx*alpha; y = oy[i] + dy*alpha; }
+      if (da > -1 && da < 1) a = oa[i] + da*alpha;
+    }
+    lay(ctx, i, moat, x, y, a);
   }
   speckle(grainTop);                         /* and a breath of it over the pieces */
   for (const b of bits){
@@ -1633,14 +1673,18 @@ function rest(){
   needsDraw = true;
 }
 
-let last = 0, hurry = false, needsDraw = true, tailRate = 1, tailAcc = 0;
+let last = 0, hurry = false, needsDraw = true, tailRate = 1, tailAcc = 0, stepCost = 4, alpha = 1;
 function frame(now){
   requestAnimationFrame(frame);
-  const dt = Math.min(1/30, last ? (now-last)/1000 : 1/60);
+  /* the time the frame actually took, not a figure standing in for it. Capped only
+     against a tab that was put away and came back */
+  const dt = Math.min(0.1, last ? (now-last)/1000 : 1/60);
   last = now;
   const moving = phase === 'dropping' || phase === 'settling';
   if (!moving && !bits.length && !needsDraw) return;
   needsDraw = false;
+  alpha = 1;                                 /* nothing to draw between, unless the
+                                                stepping below says otherwise */
   if (bits.length) flutter(dt);
   if (moving){
     if (hurry){
@@ -1676,10 +1720,24 @@ function frame(now){
       }
       tailRate += (want - tailRate)*(1 - Math.exp(-dt/TAIL_EASE));
       tailAcc += tailRate*dt/STEP;
+      /* what the frame can afford, and what real time asks for, whichever is less.
+         On a machine keeping up it is real time that decides and the pit runs at the
+         speed it should; on one that is not, the budget decides, and what gives is
+         how much of the pit's own time passes in a frame rather than how long the
+         frame takes. The picture stays even either way */
+      const afford = clamp(Math.round(FRAME_AIM*tailRate/stepCost), 1, TAIL_MOST);
+      const spent = performance.now();
       let steps = 0;
-      while (tailAcc >= 1 && steps < TAIL_MOST && (phase === 'dropping' || phase === 'settling')){
+      while (tailAcc >= 1 && steps < afford && (phase === 'dropping' || phase === 'settling')){
+        ox.set(bx.subarray(0,live)); oy.set(by.subarray(0,live)); oa.set(ba.subarray(0,live));
         advance(STEP); tailAcc -= 1; steps++;
       }
+      /* how far into the step that has not been taken yet the frame has got. The
+         pieces are drawn that far between where they were and where they are, so
+         what is on screen follows real time rather than which step boundary the
+         frame happened to land on — which is the whole of the stutter left */
+      alpha = steps ? clamp(tailAcc, 0, 1) : 1;
+      if (steps) stepCost += ((performance.now()-spent)/steps - stepCost)*(1 - Math.exp(-dt/COST_EASE));
       if (tailAcc > 2) tailAcc = 2;          /* never a debt worth catching up on */
     }
   }
@@ -1901,6 +1959,36 @@ if (new URLSearchParams(location.search).has('debug')){
              kinds: [...new Set(TPL.map(t => t.kind))],
              highest: lo, lowest: hiY, leftmost: loX, rightmost: hiX,
              xs: Array.from(bx.subarray(0,live)), ys: Array.from(by.subarray(0,live)) };
+  };
+
+  /* a probe cheap enough to call every frame without changing what it measures */
+  window.pit.lite = () => {
+    let sl = 0, dp = 0;
+    for (let i=0;i<live;i++){ if (asleep[i]) sl++; if (buried[i]) dp++; }
+    /* the moment of the pit's own time that is on the screen, which with the
+       drawing interpolated is not the moment it has stepped to */
+    return [simTime - STEP*(1-alpha), live, nc, sl, dp,
+            phase === 'dropping' ? 0 : phase === 'settling' ? 1 : 2, alpha];
+  };
+
+  /* Freezing a piece that nothing is holding up would leave it hanging in the air,
+     and nothing in the round would ever ask it to fall. So: wake the whole pit and
+     run it on. Anything that was resting on something stays where it is; anything
+     that was not, drops, and says so */
+  window.pit.hanging = (steps) => {
+    const wasX = Array.from(bx.subarray(0,live)), wasY = Array.from(by.subarray(0,live));
+    asleep.fill(0); buried.fill(0); stillFor.fill(0);
+    const wasPhase = phase, wasDamp = damp;
+    phase = 'settling'; damp = DRAG_REST;
+    for (let k=0;k<(steps||45);k++) step(1/60);
+    phase = wasPhase; damp = wasDamp;
+    const fell = [];
+    for (let i=0;i<live;i++) fell.push(Math.hypot(bx[i]-wasX[i], by[i]-wasY[i]));
+    fell.sort((a,b)=>b-a);
+    return { size: SIZE, worst: +fell[0].toFixed(2),
+             overHalf: fell.filter(v => v > SIZE*0.5).length,
+             overOne:  fell.filter(v => v > SIZE).length,
+             overTwo:  fell.filter(v => v > SIZE*2).length, live };
   };
 
   /* pin a round's shape, to try one kind or one size over and over */
