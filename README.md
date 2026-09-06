@@ -26,11 +26,21 @@ pit there is no corner for it that leaves the pieces clear.
 Behind it is a small rigid-body engine: convex outlines, separating-axis tests
 clipped down to two-point contacts, and impulses that carry across the substeps of
 a frame rather than starting from nothing each one — the difference between a heap
-that holds itself up and a heap that shivers. The frame is spent on twenty short
-steps of three passes rather than five long ones of eight, which for the same work
-leaves a heap twenty-five pieces deep about a tenth as far into itself, and the
-contacts are solved from the floor upwards, so what holds the bottom up reaches the
-top in one pass instead of one level per pass.
+that holds itself up and a heap that shivers. The frame is spent on ten short steps
+of eight passes rather than a few long ones, and the contacts are solved from the
+floor upwards, so what holds the bottom up reaches the top in one pass instead of
+one level per pass.
+
+Most of a full pit is doing nothing, and is charged for accordingly: a piece that
+has stopped moving stops being simulated, and one that has stopped moving under two
+cells of heap is buried — it is not woken by its neighbours at all. That last part
+is the whole of the saving. A sleeper roused whenever the piece beside it shuffles
+rouses the piece beside that, and a heap is one connected thing, so the pit
+liquefies and falls asleep again twice a second and the sleeping buys nothing. What
+does still reach a buried piece is being leaned on: press one more than a seventh of
+its own size into the pit under it and it takes part again, since a rigid floor part
+way up a heap has nowhere to put what settles onto it. Together that is about twice
+the pieces in the same time, and a steadier frame with it.
 
 No two pieces ever share a pixel. They collide on an outline a hair larger than the
 one drawn, so what penetration a soft solver leaves is spent in the gap rather than

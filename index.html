@@ -374,6 +374,15 @@ const HOLD       = 0.2;    /* seconds of that before the box goes up */
    whatever the number below says about how slowly it is going */
 const SLEEP_SPEED = 0.7;   /* piece-widths a second: under this it is going nowhere, */
 const SLEEP_TIME  = 0.20;  /* and after this long of that it stops being simulated */
+/* Under this much of the pit it is not merely asleep but buried, and stops being
+   woken by its neighbours at all — which is the whole of the saving. A sleeper that
+   wakes whenever the piece beside it shuffles wakes the piece beside that, and a heap
+   is one connected thing: the pit liquefies and falls asleep again twice a second,
+   and the sleeping buys nothing. It was worth a sixth; buried, it is worth a third of
+   the round */
+const BURY_DEEP   = 2;     /* cells of the broad phase, each about one large piece */
+const BURY_LOAD   = 0.14;  /* and how far into it a piece may be pressed before it is
+                              woken anyway, however deep it is buried */
 
 const TAIL       = 8;      /* under this the pit is only shuffling, */
 const TAIL_SPEED = 3;      /* so play that part out at up to triple time, */
@@ -404,7 +413,7 @@ let N = 0, live = 0, SIZE = 20;            /* SIZE: the radius a piece would hav
 let bx, by, ba, vx, vy, va, pvx, pvy, pva, sx, sy, sa, tpl, col;
 let invM, invI, bound;
 let TPL = [], rims = [], flats = [], lineW = 1, resting = null, asleep = null, stillFor = null,
-    moveRate = null;
+    moveRate = null, buried = null, surface = null;
 
 /* world outlines, rebuilt every substep */
 let wv, wn, wcount;
@@ -501,6 +510,7 @@ function allocate(n){
   invM=f(); invI=f(); bound=f();
   tpl = new Uint8Array(n); col = new Uint8Array(n); wcount = new Uint8Array(n);
   resting = new Uint8Array(n); asleep = new Uint8Array(n); stillFor = new Float32Array(n);
+  buried = new Uint8Array(n);
   moveRate = new Float32Array(n);
   wv = new Float32Array(n*MAXV*2); wn = new Float32Array(n*MAXV*2);
   maxC = n*16 + 256;         /* room enough that nothing is ever dropped */
@@ -634,7 +644,8 @@ function newRound(){
   n = Math.max(12, n);                       /* and no ceiling over it */
   const room = Math.round(n*3.2) + 16;       /* room for the pour to overrun into */
 
-  stir = SIZE*SLEEP_SPEED; shove = SIZE*6;   /* what counts as going somewhere */
+  stir = SIZE*SLEEP_SPEED; shove = SIZE*6;   /* what counts as going somewhere, */
+  load = SIZE*BURY_LOAD;                     /* and as being leaned on */
   G = G_PER_PX * SIZE;
   /* how fast a piece may fall. A landing the solver cannot stop within one step used
      to be the trigger for almost every jam, and the crowded rounds had to fall
@@ -670,7 +681,7 @@ function pour(again){
   fixed = !!again;
   live = 0; deckAt = 0; pourT = 0; stuck = 0; calm = 0; simTime = 0; damp = DRAG; busy = Infinity;
   rescues = 0; lifts = 0; jamKey = -1; jamFor = 0; jamC = -1;
-  if (asleep){ asleep.fill(0); stillFor.fill(0); }
+  if (asleep){ asleep.fill(0); stillFor.fill(0); buried.fill(0); }
   tailRate = 1; tailAcc = 0;
   asked = false;
   pourTime = Math.min(POUR_MAX, Math.max(POUR_MIN, N/POUR_RATE));
@@ -788,8 +799,9 @@ function spawnOne(){
        pixels inside another is not something the solver can talk its way out of */
     if (!fits(live, px, py, Math.random()*6.2832)) continue;
     const u = Math.sqrt(G*SIZE);
-    asleep[live]=0; stillFor[live]=0; moveRate[live]=Infinity;   /* it has only just
-                                                    been let go: it wakes what it lands on */
+    asleep[live]=0; buried[live]=0; stillFor[live]=0;
+    moveRate[live]=Infinity;                 /* it has only just been let go: it wakes
+                                                whatever it lands on */
     vx[live]=(Math.random()-.5)*u*.35; vy[live]=u*.2; va[live]=(Math.random()-.5)*4;
     col[live]=deck[deckAt++];
     live++;
@@ -799,15 +811,37 @@ function spawnOne(){
 }
 
 /* ----------------------------------------------------------------- solver */
-function wake(i){ asleep[i] = 0; stillFor[i] = 0; moveRate[i] = 0; }
+function wake(i){ asleep[i] = 0; buried[i] = 0; stillFor[i] = 0; moveRate[i] = 0; }
 
 /* is this piece actually going somewhere? Out here rather than inside the contact,
    which is asked a million times a second and cannot afford to build a function to
    answer it each time */
-let stir = 0, shove = 0;
+let stir = 0, shove = 0, load = 0;
 function going(j){
   return moveRate[j] > stir ||
          Math.hypot(vx[j],vy[j]) + Math.abs(va[j])*bound[j] > shove;
+}
+
+/* Which of the sleepers are under enough of the pit that nothing happening at the
+   surface can reach them. The surface is read a column of the broad phase at a time,
+   and only what is resting or asleep counts towards it: rain on its way down would
+   otherwise stand as the top of every column it falls through, and nothing under a
+   pour would ever be buried — which is exactly when the burying is worth most */
+function entomb(){
+  const inv = 1/cell;
+  if (!surface || surface.length < cols) surface = new Int32Array(cols);
+  surface.fill(rows);
+  const colOf = i => { let c = (bx[i]*inv)|0; return c < 0 ? 0 : c >= cols ? cols-1 : c; };
+  const rowOf = i => { let r = ((by[i]-originY)*inv)|0; return r < 0 ? 0 : r >= rows ? rows-1 : r; };
+  for (let i=0;i<live;i++){
+    if (!(resting[i] || asleep[i])) continue;
+    const c = colOf(i), r = rowOf(i);
+    if (r < surface[c]) surface[c] = r;
+  }
+  for (let i=0;i<live;i++){
+    if (!asleep[i] || buried[i]) continue;
+    if (rowOf(i) >= surface[colOf(i)] + BURY_DEEP) buried[i] = 1;
+  }
 }
 
 /* and everything the piece was leaning on, for when it is moved by hand rather than
@@ -857,6 +891,8 @@ function broad(){
        pieces are simply never told about each other and pass through. Worse, the pit
        is walked cell by cell from the top left, so the pairs that fell off the end
        were always the same ones — the bottom right corner, every time */
+    if (asleep[a] && asleep[b]) return;     /* neither has moved, so whatever was
+                                               between them still is */
     if (np >= pairA.length){
       const bigger = new Int32Array(pairA.length*2);
       bigger.set(pairA); pairA = bigger;
@@ -1050,8 +1086,18 @@ function record(A, B, nx, ny, px, py, depth, key, feat){
   if (A >= 0) resting[A] = 1;
   if (B >= 0) resting[B] = 1;
   if (A >= 0 && B >= 0){
-    if (asleep[A] && !asleep[B] && going(B)) wake(A);
-    else if (asleep[B] && !asleep[A] && going(A)) wake(B);
+    if (asleep[A] && !asleep[B] && !buried[A] && going(B)) wake(A);
+    else if (asleep[B] && !asleep[A] && !buried[B] && going(A)) wake(B);
+  }
+  /* A buried piece wakes for load rather than for movement. What it must never do is
+     hold its ground while the pit above settles onto it: a rigid floor part way up a
+     heap has nowhere to put what is pressed into it, and the overlap simply grows
+     until pieces are sitting inside one another. A pit that has come to rest presses
+     its contacts a fraction of a pixel deep, so this asks nothing of it — it is only
+     the ones being leaned on hard that are asked to take part again */
+  if (depth > load){
+    if (A >= 0 && buried[A]) wake(A);
+    if (B >= 0 && buried[B]) wake(B);
   }
 
   /* a sleeper weighs what a wall weighs. It is not going to move for this contact,
@@ -1142,11 +1188,12 @@ function sortContacts(){
    iterations have not yet resolved is handed back as speed */
 function solve(h){
   const push = BETA/h;
-  /* once the pouring has stopped there is frame to spare, and the passes are what
-     squeeze the last of the overlap out of a wedged piece. Spending fewer of them
-     where the contacts are many is precisely the wrong economy: those are the pits
-     that jam, and it took the jams from two rounds in ten to five */
-  const iters = damp === DRAG_REST ? ITER*2 : ITER;
+  /* The settling used to be given twice the passes: a pit that has stopped pouring
+     has frame to spare, and the passes are what squeeze the last of the overlap out
+     of a wedged piece. That was worth it while the wedged piece was common. With the
+     buried part of the heap out of the solver entirely there is far less to wedge,
+     and the doubling costs a third of the round for penetration no better */
+  const iters = ITER;
   for (let i=0;i<live;i++){ pvx[i]=0; pvy[i]=0; pva[i]=0; }
   for (let k=0;k<nc;k++) cpn[k] = 0;
   for (let it=0; it<iters; it++){
@@ -1214,7 +1261,7 @@ function solve(h){
 function separate(){
   /* the whole pit, awake, whatever it was doing: this is the pass that guarantees no
      two pieces share a pixel, and it cannot make that good for a piece it skips */
-  asleep.fill(0); stillFor.fill(0);
+  asleep.fill(0); stillFor.fill(0); buried.fill(0);
   keyAge.fill(-9);                           /* nothing carried into a still pit */
   const until = performance.now() + 500;     /* a one-off, on a pit about to stop */
   for (let pass=0; pass<30 && performance.now() < until; pass++){
@@ -1373,6 +1420,7 @@ function travelled(){
       if (stillFor[i] > SLEEP_TIME){ asleep[i] = 1; vx[i]=0; vy[i]=0; va[i]=0; }
     } else stillFor[i] = 0;
   }
+  entomb();
   snap();
   return m/span;
 }
@@ -1417,34 +1465,39 @@ function flutter(dt){
 }
 
 /* ---------------------------------------------------------------- drawing */
+/* one piece, on whatever surface is being drawn */
+function lay(g, i, moat){
+  const t = TPL[tpl[i]];
+  g.save();
+  g.translate(bx[i], by[i]);
+  g.rotate(ba[i]);
+  /* cut a little ground round this piece before laying it down, so that whatever
+     was drawn before it cannot share a pixel with it however the two are sitting */
+  g.lineWidth = moat;
+  g.strokeStyle = ground[clamp((by[i]/H*11)|0, 0, 11)];
+  g.stroke(t.path);
+  g.lineWidth = lineW;
+  g.fillStyle = flats[col[i]];
+  g.fill(t.path);
+  g.strokeStyle = rims[col[i]];
+  g.stroke(t.path);
+  g.restore();
+}
+
 function draw(){
-  ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
   /* most of the speckle belongs to the ground, so it goes down with the ground and
      the pieces are laid on top of it: over the top of everything instead it read as
      grain in a photograph of the pit rather than as the surface they lie on */
   if (!grainLow){ grainLow = makeGrain(GRAIN_GROUND); grainTop = makeGrain(GRAIN_PIECES); }
+  const moat = lineW + 3;
+  ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
   speckle(grainLow);
   ctx.lineWidth = lineW;
   ctx.lineJoin = 'round';
-  const moat = lineW + 3;
   ctx.fillStyle = flats[0];
   for (let i=0;i<live;i++){
     if (by[i] + bound[i] < 0) continue;
-    const t = TPL[tpl[i]];
-    ctx.save();
-    ctx.translate(bx[i], by[i]);
-    ctx.rotate(ba[i]);
-    /* cut a little ground round this piece before laying it down, so that whatever
-       was drawn before it cannot share a pixel with it however the two are sitting */
-    ctx.lineWidth = moat;
-    ctx.strokeStyle = ground[clamp((by[i]/H*11)|0, 0, 11)];
-    ctx.stroke(t.path);
-    ctx.lineWidth = lineW;
-    ctx.fillStyle = flats[col[i]];
-    ctx.fill(t.path);
-    ctx.strokeStyle = rims[col[i]];
-    ctx.stroke(t.path);
-    ctx.restore();
+    lay(ctx, i, moat);
   }
   speckle(grainTop);                         /* and a breath of it over the pieces */
   for (const b of bits){
@@ -1842,7 +1895,9 @@ if (new URLSearchParams(location.search).has('debug')){
     for (let k=0;k<nc;k++) if (cdep[k] > maxdep) maxdep = cdep[k];
     const speeds = [];
     for (let i=0;i<live;i++) speeds.push(Math.hypot(vx[i],vy[i]) + Math.abs(va[i])*bound[i]);
-    return { phase, asked, count: N, live, r: SIZE, w: W, h: H, busiest: busy, speeds, ceil, cap, maxdep, nc,
+    let sleeping = 0, deep = 0;
+    for (let i=0;i<live;i++){ if (asleep[i]) sleeping++; if (buried[i]) deep++; }
+    return { phase, asked, count: N, live, r: SIZE, w: W, h: H, busiest: busy, speeds, ceil, cap, maxdep, nc, np, sleeping, deep, t: simTime,
              kinds: [...new Set(TPL.map(t => t.kind))],
              highest: lo, lowest: hiY, leftmost: loX, rightmost: hiX,
              xs: Array.from(bx.subarray(0,live)), ys: Array.from(by.subarray(0,live)) };
