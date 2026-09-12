@@ -42,13 +42,20 @@ circle, two for the petal, then three, four, five, six. So a level's reward says
 something true about the level — "Level 4! Rectangles unlocked — four sides." — and
 the pattern is left there to be noticed, which is the best kind of teaching there is.
 When a level hands one over, the shape itself comes forward: large, in the level's
-colour, over the top of everything, turning twice and slowing to a stop the right way
-up, with a glow round it that breathes three times while it does. It sits in the clear
-air above the card rather than over it, so the shape and the line naming it can be had
-at once — and where there is no clear air, over the card beats half off the top of the
-screen. The glow is drawn rather than blurred, two larger copies of the same outline
-under a radial wash, because what shadowBlur does to a scaled transform is not the
-same in every browser.
+colour, in the middle of the page over the top of everything, turning twice and slowing
+to a stop the right way up, with a glow round it that breathes three times while it
+does. The rest of the page dims towards its own background for the second and a half
+it takes, so the new shape is the only thing in the room, and "Level 5 unlocked" comes
+up in big type underneath a beat after the shape does — the shape sits a little above
+centre so that the pair of them is what is centred, rather than the shape alone. The
+glow is drawn rather than blurred, two larger copies of the same outline under a radial
+wash, because what shadowBlur does to a scaled transform is not the same in every
+browser.
+
+The round that follows an unlock belongs to that shape alone, and is cut from the
+larger half of the size range: seeing the pit filled with pentagons is more of a reward
+than being told that pentagons exist, and a pit of seven-pixel pentagons is a poor look
+at a pentagon.
 
 The card carries the collection as a row of little shapes, the locked ones left
 faint, each turned the way a book would show it, since at that size a point-up

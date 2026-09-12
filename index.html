@@ -568,6 +568,7 @@ let wv, wn, wcount;
 /* the broad phase: a grid of bounding circles, and the pairs it turns up */
 let cell = 0, cols = 0, rows = 0, originY = 0, starts, cursor, items, pairA, pairB, np = 0;
 let forced = null;      /* ?debug may pin a round's shape, to test one kind at a time */
+let debut = null;       /* a shape just unlocked, whose own round comes next */
 
 /* contacts found by the position pass, replayed by the velocity pass */
 let cA, cB, cnx, cny, crax, cray, crbx, crby, cdep, cwn, cwt, cjn, cjt, ctar, cpn, ckey, cfeat,
@@ -745,8 +746,12 @@ function newRound(){
   /* one kind in play, or two — never a jumble of everything, and never one this
      player has not earned yet */
   const pool = unlocked(facing);
+  /* the round straight after an unlock belongs to that shape alone: seeing the pit
+     filled with them is more of a reward than being told they exist */
+  const show = debut && pool.includes(debut) ? [debut] : null;
+  debut = null;
   const kinds = forced && forced.kinds ? forced.kinds.slice()
-              : shuffle(pool.slice()).slice(0, Math.random() < .35 || pool.length < 2 ? 1 : 2);
+              : show || shuffle(pool.slice()).slice(0, Math.random() < .35 || pool.length < 2 ? 1 : 2);
 
   /* how loosely a heap of this kind packs, which is what the count has to be reckoned
      on. How deep it may get is not limited any more: it fills to the card and stops */
@@ -759,7 +764,10 @@ function newRound(){
      draw of difficulty — nearly every round comes out large and easy, and the ones
      worth counting hardly ever turn up */
   const big = Math.max(MIN_PIECE*1.5, 0.098*minDim);
-  SIZE = Math.round(MIN_PIECE * Math.pow(big/MIN_PIECE, Math.random()) * 2)/2;
+  /* a debut round draws from the upper half of the range: a pit of seven-pixel
+     pentagons is a poor look at a pentagon */
+  const scale = show ? 0.45 + Math.random()*0.55 : Math.random();
+  SIZE = Math.round(MIN_PIECE * Math.pow(big/MIN_PIECE, scale) * 2)/2;
   if (forced && forced.size) SIZE = forced.size;
   const area = Math.PI*SIZE*SIZE;
 
@@ -2377,19 +2385,11 @@ function startReveal(kind, lv){
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if (!chipFor || !chipFor[kind]) return;
   const tint = getComputedStyle(document.body).getPropertyValue(`--lv${lv}`).trim();
-  const r = mathCard.getBoundingClientRect();
-  /* in the clear air above the card rather than over it, so the shape and the line
-     naming it can be had at the same time. Where there is no clear air — a window
-     short enough that the card is most of it — over the card is better than half
-     off the top of the screen */
-  const R = Math.min(W,H)*0.17;
-  const roof = (ladder.hidden ? 6 : ladder.getBoundingClientRect().bottom) + 10;
-  let cy = r.height ? r.top - R*0.8 : H/2;
-  /* the shape itself has to clear the bar; the glow round it may spill over the
-     title, which is a few words at the far left and no great loss */
-  if (cy - R*0.95 < roof) cy = r.height ? r.top + r.height/2 : H/2;
-  reveal = { kind, at: performance.now(), rgb: hex(tint || '#9A6B1F'),
-             cx: r.width ? r.left + r.width/2 : W/2, cy };
+  const ink = getComputedStyle(document.body).getPropertyValue('--ink').trim();
+  /* the middle of the page, and big: the shape sits a little above centre with the
+     line under it, so the pair of them is what is centred rather than the shape */
+  reveal = { kind, lv, at: performance.now(), rgb: hex(tint || '#9A6B1F'),
+             scrim: hex(ink || '#ECE5DB') };
   fitReveal();
   revealCv.hidden = false;
 }
@@ -2416,12 +2416,23 @@ function drawReveal(now){
   const beat = 0.55 + 0.45*Math.sin(t*Math.PI*3);
   const fade = t < 0.09 ? t/0.09 : t > 0.8 ? (1-t)/0.2 : 1;
 
-  const size = Math.min(W,H)*0.17*(0.2 + 0.8*grow);
+  /* the shape sits a little above the middle with the line under it, so what is
+     centred on the page is the pair of them rather than the shape alone */
+  const R = Math.min(W*0.34, H*0.2);
+  const cx = W/2, cy = H/2 - R*0.25;
+  const size = R*(0.2 + 0.8*grow);
   const rgb = reveal.rgb, ink = a => `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`;
   const path = chipFor[reveal.kind].tpl.path, f = size/chipFor[reveal.kind].ext;
 
+  /* the page dimmed towards its own background, so for a second and a half the
+     new shape is the only thing in the room */
+  const sc = reveal.scrim;
+  g.fillStyle = `rgba(${sc[0]},${sc[1]},${sc[2]},${0.78*fade})`;
+  g.fillRect(0, 0, W, H);
+
   g.globalAlpha = fade;
-  g.translate(reveal.cx, reveal.cy);
+  g.save();
+  g.translate(cx, cy);
 
   const wash = g.createRadialGradient(0,0, size*0.4, 0,0, size*2.5);
   wash.addColorStop(0, ink(0.42*beat));
@@ -2441,6 +2452,25 @@ function drawReveal(now){
   g.lineJoin = 'round';
   g.strokeStyle = ink(0.3);
   g.stroke(path);
+  g.restore();
+
+  /* and the news in big type, arriving a beat after the shape does */
+  const said = clamp((t - 0.22)/0.22, 0, 1);
+  if (said > 0){
+    const face = px => `600 ${px}px "Iowan Old Style","Palatino Linotype",Palatino,`
+                      + `"Hoefler Text",Georgia,serif`;
+    const line = `Level ${reveal.lv} unlocked`;
+    let px = Math.round(clamp(R*0.34, 20, 64));
+    g.font = face(px);
+    /* and made to fit the narrowest phone rather than run off the edge of it */
+    const room = W - 32, wide = g.measureText(line).width;
+    if (wide > room){ px = Math.max(16, Math.floor(px*room/wide)); g.font = face(px); }
+    g.globalAlpha = fade*said;
+    g.textAlign = 'center';
+    g.textBaseline = 'alphabetic';
+    g.fillStyle = ink(1);
+    g.fillText(line, cx, cy + R*1.35);
+  }
   g.globalAlpha = 1;
 }
 
@@ -2546,6 +2576,7 @@ function answer(given, btn){
     showLadder(who, up);
     showChips(who, won);
     if (won.length){
+      debut = won[0];                          /* and the next round is its own */
       startReveal(won[0], lv + 1);             /* the shape itself, brought forward */
       setTimeout(() => showChips(who, null), 1700);   /* the chip settles after it */
     }
@@ -2731,6 +2762,7 @@ if (new URLSearchParams(location.search).has('debug')){
   window.pit.reach = who => reach(who);
   window.pit.rebuildChips = () => buildChips();   /* fresh draws of the templates */
   window.pit.reveal = () => reveal && reveal.kind;
+  window.pit.debut = k => { if (k !== undefined) debut = k; return debut; };
 
   /* pin a round's shape, to try one kind or one size over and over */
   window.pit.force = f => { forced = f; };
