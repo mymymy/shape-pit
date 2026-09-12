@@ -37,6 +37,16 @@ are on is something you can see across the room rather than a number to read. Ev
 right answer throws a handful of confetti; finishing a level fills the bar to the
 top, says "Level 3!" on the card in that level's colour, and throws the lot.
 
+And each level unlocks a shape. The pit starts with three in it — balls, tiles and
+pebbles, all rounded and well behaved — and the rest are earned a level at a time,
+running out through slabs and shards to petals, planks and sticks, so the heap
+visibly gets more interesting as they climb rather than merely different. Levelling
+up says which one it was — "Level 2! Slabs unlocked." — and the round that follows is
+cut with it in. The card carries the collection as a row of little shapes, the ones
+still locked left faint, drawn out of the same templates the pit itself is cut from.
+Both ladders end with all eight, whichever length they are. With no maths on, the pit
+has all eight from the start, as it always did.
+
 Venus climbs her own four tiers, three right answers for Level 2 and then four and
 five. Bea's ladder has six rungs and opens on two levels of Venus's bank — the same
 sums her sister is doing, which she can do standing on her head — before starting on

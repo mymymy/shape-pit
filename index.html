@@ -38,7 +38,9 @@ body{
   -webkit-user-select:none; user-select:none;
 }
 .serif{font-family:"Iowan Old Style","Palatino Linotype",Palatino,"Hoefler Text",Georgia,serif}
-canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+/* the pit by name, not every canvas on the page: the shapes collected are canvases
+   too, and pinned by this they stacked up in the corner of the card */
+#pit{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
 [hidden]{display:none!important}
 
 /* the heads-up layer sits over the pit and lets clicks through except on its own controls */
@@ -153,6 +155,12 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
 .tally{margin:10px 0 0!important;font-size:12px;color:var(--dim)!important;
   font-variant-numeric:tabular-nums}
 #mathGo{margin-top:14px}
+/* the shapes collected so far, and the ones still to come */
+.kinds{display:flex;gap:7px;justify-content:center;align-items:center;margin-top:14px;flex-wrap:wrap}
+.chip{flex:0 0 auto;width:28px;height:28px;opacity:.18;
+  transition:opacity .45s ease, transform .45s cubic-bezier(.2,1.5,.4,1)}
+.chip.got{opacity:.7}
+.chip.fresh{opacity:1;transform:scale(1.4)}
 </style>
 
 <canvas id="pit"></canvas>
@@ -226,6 +234,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
       <p class="mark" id="mark" aria-live="polite"></p>
       <button class="primary" type="button" id="mathGo" hidden>Drop them in</button>
       <p class="tally" id="tally"></p>
+      <div class="kinds" id="kinds" hidden title="Shapes unlocked"></div>
     </form>
   </div>
 </div>
@@ -703,9 +712,11 @@ function newRound(){
   fit();
   const minDim = Math.min(W,H);
 
-  /* one kind in play, or two — never a jumble of everything */
+  /* one kind in play, or two — never a jumble of everything, and never one this
+     player has not earned yet */
+  const pool = unlocked(facing);
   const kinds = forced && forced.kinds ? forced.kinds.slice()
-              : shuffle(KEYS.slice()).slice(0, Math.random() < .35 ? 1 : 2);
+              : shuffle(pool.slice()).slice(0, Math.random() < .35 || pool.length < 2 ? 1 : 2);
 
   /* how loosely a heap of this kind packs, which is what the count has to be reckoned
      on. How deep it may get is not limited any more: it fills to the card and stops */
@@ -2149,6 +2160,25 @@ const LADDER = {
   Venus: YOUNGER,
   Bea:   [YOUNGER[1], YOUNGER[3], OLDER[0], OLDER[1], OLDER[2], OLDER[3]]
 };
+/* What the maths is actually for, as far as anyone playing is concerned: the pit
+   starts with three shapes in it and the rest are earned a level at a time. The
+   order runs from the rounded and well-behaved to the long and dramatic, so the
+   heap visibly gets more interesting as they climb rather than merely different.
+   Both ladders end with all eight, whichever length they are */
+const UNLOCK = ['ball','tile','pebble','slab','shard','petal','plank','stick'];
+const FREE_KINDS = 3;
+const PLURAL = { ball:'balls', tile:'tiles', pebble:'pebbles', slab:'slabs',
+                 shard:'shards', petal:'petals', plank:'planks', stick:'sticks' };
+/* a set tilt each, so the collection reads as a handful someone dropped rather than
+   a rank of bars — and so the long ones are told apart at a glance */
+const TILT = { ball:0, tile:-0.2, pebble:0.3, slab:0.42, shard:-0.32, petal:0.14,
+               plank:-0.45, stick:0.55 };
+
+function unlocked(who){
+  if (!who || !LADDER[who]) return UNLOCK;   /* nobody at the card: no locks either */
+  const st = standing(who), rungs = st.levels - 1, span = UNLOCK.length - FREE_KINDS;
+  return UNLOCK.slice(0, FREE_KINDS + (rungs > 0 ? Math.round(st.lv/rungs*span) : span));
+}
 /* what each rung costs in right answers. They cost more as they go, so the warm-up
    is a warm-up and the top of the ladder is worth getting to */
 const COST = {
@@ -2217,6 +2247,68 @@ function showLadder(who, lifted){
   ladder.hidden = false;
 }
 
+/* The collection, drawn out of the same templates the pit is cut from, so the shape
+   on the card is the shape that turns up in the heap. Built once and repainted when
+   the theme changes, since what it is drawn in is the ink of the page */
+const kindsBox = el('kinds');
+let chipFor = null;
+function buildChips(){
+  chipFor = {};
+  kindsBox.textContent = '';
+  for (const k of UNLOCK){
+    const c = document.createElement('canvas');
+    c.className = 'chip';
+    c.title = PLURAL[k];
+    chipFor[k] = { box: c, tpl: template(k, 300, 0.5) };
+    kindsBox.appendChild(c);
+  }
+  paintChips();
+}
+
+function paintChips(){
+  if (!chipFor) return;
+  const ink = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#222';
+  const px = 28, dp = Math.min(devicePixelRatio || 1, 2);
+  for (const k of UNLOCK){
+    const c = chipFor[k].box, tpl = chipFor[k].tpl;
+    c.width = Math.round(px*dp); c.height = Math.round(px*dp);
+    const g = c.getContext('2d');
+    g.setTransform(dp,0,0,dp,0,0);
+    g.translate(px/2, px/2);
+    g.rotate(TILT[k]);
+    const f = (px/2 - 1.5)/tpl.bound;        /* a stick and a ball are the same area,
+                                                so each is fitted to the chip by its
+                                                own reach rather than by that */
+    g.scale(f, f);
+    g.fillStyle = ink;
+    g.strokeStyle = ink;
+    /* stroked as well as filled: a stick fitted to a chip this size is three pixels
+       across and reads as a smudge without it */
+    g.lineWidth = 1.4/f;
+    g.lineJoin = 'round';
+    g.fill(tpl.path);
+    g.stroke(tpl.path);
+  }
+}
+
+function showChips(who, fresh){
+  if (!players.length || !who || !chipFor){ kindsBox.hidden = true; return; }
+  const got = new Set(unlocked(who));
+  for (const k of UNLOCK){
+    chipFor[k].box.classList.toggle('got', got.has(k));
+    chipFor[k].box.classList.toggle('fresh', !!fresh && fresh.includes(k));
+  }
+  kindsBox.hidden = false;
+}
+
+/* what a level just handed over, said out loud */
+function gift(list){
+  if (!list.length) return '';
+  const n = list.map(k => PLURAL[k]);
+  const said = n.length > 1 ? n.slice(0,-1).join(', ') + ' and ' + n[n.length-1] : n[0];
+  return ' ' + said.charAt(0).toUpperCase() + said.slice(1) + ' unlocked.';
+}
+
 /* whose turn, and where they now stand */
 function sayTurn(who){
   const st = standing(who);
@@ -2255,6 +2347,7 @@ function poseQuestion(){
   tries = 0;
   sayTurn(who);
   showLadder(who, false);
+  showChips(who, null);
   askEl.textContent = quiz.q;
   askEl.classList.toggle('wordy', quiz.q.length > 26);
   markEl.textContent = ''; markEl.className = 'mark'; markEl.style.color = '';
@@ -2289,20 +2382,25 @@ function answer(given, btn){
     : String(given).trim() === String(want);
 
   if (right){
-    const was = standing(quiz.who).lv;
-    tally[quiz.who].asked++; tally[quiz.who].right++;
-    const up = standing(quiz.who).lv > was;
-    markEl.textContent = up ? `Level ${standing(quiz.who).lv + 1}!`
+    const who = quiz.who;                      /* held on to: quiz is cleared below,
+                                                  and the settling runs after that */
+    const was = standing(who).lv, had = unlocked(who);
+    tally[who].asked++; tally[who].right++;
+    const now = standing(who).lv, up = now > was;
+    const won = unlocked(who).filter(k => !had.includes(k));
+    markEl.textContent = up ? `Level ${now + 1}!` + gift(won)
                         : tries ? 'That\u2019s it.'
                         : oneOf(['Yes.', 'That\u2019s it.', 'Spot on.', 'Correct.']);
     markEl.className = 'mark yes';
-    markEl.style.color = up ? `var(--lv${standing(quiz.who).lv + 1})` : '';
+    markEl.style.color = up ? `var(--lv${now + 1})` : '';
     entryEl.hidden = true; pickEl.hidden = true;
     showTally();
-    showLadder(quiz.who, up);
+    showLadder(who, up);
+    showChips(who, won);
+    if (won.length) setTimeout(() => showChips(who, null), 1400);   /* let it settle */
     /* every right answer gets a handful; finishing a level gets the lot */
     shower(mathCard, up ? 220 : 60);
-    if (up) sayTurn(quiz.who);                 /* the card says where they now are */
+    if (up) sayTurn(who);                      /* the card says where they now are */
     quiz = null;
     setTimeout(fallIn, up ? 1900 : 850);       /* a beat to see it, then the pieces */
     return;
@@ -2342,6 +2440,7 @@ mathGo.addEventListener('click', fallIn);
 for (const b of el('whoPick').children)
   b.addEventListener('click', () => setPlayers(b.dataset.who ? b.dataset.who.split('+') : []));
 
+buildChips();
 try { setPlayers((localStorage.getItem(WHO_KEY) || '').split('+')); } catch (e) { setPlayers([]); }
 
 el('dropBtn').addEventListener('click', begin);
@@ -2357,7 +2456,7 @@ guessCard.addEventListener('submit', e => {
 
 /* the ground and the pit are painted from the stylesheet, so a change of theme
    means reading it again */
-const repaint = () => { fit(); needsDraw = true; };
+const repaint = () => { fit(); paintChips(); needsDraw = true; };
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', repaint);
 new MutationObserver(repaint).observe(document.documentElement, { attributeFilter: ['data-theme'] });
 
@@ -2475,6 +2574,7 @@ if (new URLSearchParams(location.search).has('debug')){
   window.pit.tally = () => tally;
   window.pit.bits = () => bits.length;   /* confetti in the air */
   window.pit.rungs = who => LADDER[who].length;
+  window.pit.pool = who => unlocked(who).slice();
 
   /* pin a round's shape, to try one kind or one size over and over */
   window.pit.force = f => { forced = f; };
