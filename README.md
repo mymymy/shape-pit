@@ -5,9 +5,9 @@ nothing is moving you say how many there are.
 
 **Play it: https://mymymy.github.io/shape-pit/**
 
-Every round is cut afresh: one shape or two out of six that no child would give the
-same name — circles, triangles, rounded rectangles, lumpy pebbles, jagged shards, and
-sticks that come to rest across one another like a dropped handful — in a palette of its own each time. How big a
+Every round is cut afresh: one shape or two out of six, ordered by how many sides
+they have — circles, petals, triangles, rectangles, pentagons, hexagons — which come
+to rest across one another like a dropped handful — in a palette of its own each time. How big a
 piece is varies most of all, and is drawn evenly across the scales rather than
 evenly across the pixels, so the hard rounds turn up as often as the easy ones.
 
@@ -37,12 +37,17 @@ are on is something you can see across the room rather than a number to read. Ev
 right answer throws a handful of confetti; finishing a level fills the bar to the
 top, says "Level 3!" on the card in that level's colour, and throws the lot.
 
-And each level unlocks a shape. The pit begins with circles and nothing else, and
-every level adds exactly one more: triangles, then rectangles, then pebbles, then
-shards, then sticks. The card carries the collection as a row of little shapes, the
-ones still locked left faint, drawn out of the same templates the pit itself is cut
-from. Levelling up says which one it was — "Level 2! Triangles unlocked." — and the
-round that follows is cut with it in.
+And each level unlocks a shape, with the level for its number of sides: one for the
+circle, two for the petal, then three, four, five, six. So a level's reward says
+something true about the level — "Level 4! Rectangles unlocked — four sides." — and
+the pattern is left there to be noticed, which is the best kind of teaching there is.
+The card carries the collection as a row of little shapes, the locked ones left
+faint, each turned the way a book would show it, since at that size a point-up
+pentagon and a flat-topped hexagon are the only thing telling the two apart.
+
+The circle and the petal are not given a side count anywhere, only a place in the
+order. Whether a circle has one side or none is a thing some teachers say and others
+mark wrong, and this is not the game to settle it in. Three onwards is not in doubt.
 
 One a level means a ladder collects as many shapes as it has rungs, so Bea's six
 reach all six and Venus's four reach the first four: circles, triangles, rectangles
