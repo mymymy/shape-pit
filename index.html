@@ -105,6 +105,33 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
 .detail b{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums}
 .best{margin:0 0 14px!important;font-size:12px;color:var(--dim)!important;
   font-variant-numeric:tabular-nums;min-height:1.2em}
+
+/* maths mode: a question before the pieces fall */
+.who{margin-top:18px;padding-top:16px;border-top:1px solid var(--edge)}
+.who h3{margin:0 0 6px;font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--dim);font-weight:500}
+.who p{margin:0 0 12px!important;font-size:13px}
+.choices{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.choices button{min-width:76px}
+.choices button.on{border-color:var(--hi);color:var(--hi);font-weight:500}
+
+#mathCard{max-width:min(470px,calc(100vw - 36px))}
+.turn{margin:0 0 10px!important;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim)}
+.ask{margin:0 0 18px;font-size:32px;line-height:1.2;letter-spacing:-.01em;
+  font-variant-numeric:tabular-nums}
+.ask.wordy{font-size:19px;line-height:1.45}
+.entry{display:flex;gap:10px;justify-content:center;align-items:center}
+#mathInput{font-size:26px;width:6ch}
+.mark{margin:14px 0 0!important;min-height:1.5em;font-size:15px;text-wrap:pretty}
+.mark.yes{color:var(--hi);font-weight:500}
+.tally{margin:10px 0 0!important;font-size:12px;color:var(--dim)!important;
+  font-variant-numeric:tabular-nums}
+#mathGo{margin-top:14px}
+/* quiet, and at the bottom: it is the way out of the maths, and it is sitting on a
+   card being read by the person the maths is for */
+#mathOff{margin-top:14px;background:none;border-color:transparent;font-size:11px;
+  opacity:.55;padding:4px 8px}
+#mathOff:hover{opacity:1}
 </style>
 
 <canvas id="pit"></canvas>
@@ -145,7 +172,33 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
          to rest, say how many there are. Every round is cut afresh &mdash; new
          shapes, new sizes, new colours.</p>
       <button class="primary" id="dropBtn">Drop them in</button>
+
+      <div class="who">
+        <h3>Maths mode</h3>
+        <p>A question to answer before each round. Pick both and you take it in turns.</p>
+        <div class="choices" id="whoPick">
+          <button data-who="Bea">Bea</button>
+          <button data-who="Venus">Venus</button>
+          <button data-who="Bea+Venus">Both</button>
+          <button data-who="">No maths</button>
+        </div>
+      </div>
     </div>
+
+    <form class="card" id="mathCard" hidden autocomplete="off">
+      <p class="turn" id="turn"></p>
+      <h2 class="serif ask" id="ask"></h2>
+      <div class="choices" id="pick" hidden></div>
+      <div class="entry" id="entry">
+        <input id="mathInput" type="number" step="any" inputmode="numeric"
+               aria-label="Your answer" placeholder="?">
+        <button class="primary" type="submit">Answer</button>
+      </div>
+      <p class="mark" id="mark" aria-live="polite"></p>
+      <button class="primary" type="button" id="mathGo" hidden>Drop them in</button>
+      <p class="tally" id="tally"></p>
+      <button class="ghost" type="button" id="mathOff">Stop the maths</button>
+    </form>
   </div>
 </div>
 
@@ -1749,6 +1802,7 @@ function start(){
   startCard.hidden = true;
   resultCard.hidden = true;
   guessCard.hidden = true;
+  mathCard.hidden = true;
   newRound();
   judged = false;
   guessInput.value = '';
@@ -1868,8 +1922,269 @@ asker.addEventListener('click', e => {
   if (justDragged){ e.preventDefault(); e.stopPropagation(); }
 }, true);
 
-el('dropBtn').addEventListener('click', start);
-el('againBtn').addEventListener('click', start);
+
+/* ------------------------------------------------------------ maths mode */
+/* A question before the pieces fall. Two banks, pitched at the two people who play
+   it: roughly Year 3 for the seven-year-old and Year 6 for the ten-year-old, which
+   is about where the curriculum puts number bonds and halving on one side, and
+   fractions of amounts, percentages and long multiplication on the other.
+
+   Every question is generated rather than listed, so the same one does not come
+   round twice in an evening, and every answer is a number or one of a few buttons —
+   nothing to spell, nothing to get wrong for the wrong reason */
+const ri = (lo,hi) => lo + Math.floor(Math.random()*(hi-lo+1));
+const oneOf = a => a[Math.floor(Math.random()*a.length)];
+const someOf = (a,n) => shuffle(a.slice()).slice(0,n);
+const pad2 = n => String(n).padStart(2,'0');
+const neg = n => (n < 0 ? '−' : '') + Math.abs(n);
+const frac = [[1,2],[1,3],[2,3],[1,4],[3,4],[1,5],[2,5],[3,5],[4,5],[1,6],[5,6],[3,8],[5,8],[3,10],[7,10]];
+
+const YOUNGER = [
+  () => { const a = ri(11,49), b = ri(11,49); return { q: `${a} + ${b}`, a: a+b }; },
+  () => { const a = ri(24,68), b = ri(3,21); return { q: `${a} − ${b}`, a: a-b }; },
+  () => { const a = ri(1,9);  return { q: `${a} + ? = 10`, a: 10-a }; },
+  () => { const a = ri(1,19); return { q: `${a} + ? = 20`, a: 20-a }; },
+  () => { const a = ri(1,9)*10; return { q: `${a} + ? = 100`, a: 100-a }; },
+  () => { const t = oneOf([2,5,10]), n = ri(2,12); return { q: `${n} × ${t}`, a: n*t }; },
+  () => { const t = oneOf([2,5,10]), n = ri(2,12); return { q: `${n*t} ÷ ${t}`, a: n }; },
+  () => { const t = oneOf([3,4]), n = ri(2,10);    return { q: `${n} × ${t}`, a: n*t }; },
+  () => { const n = ri(6,25); return { q: `Double ${n}`, a: n*2 }; },
+  () => { const n = ri(4,25)*2; return { q: `Half of ${n}`, a: n/2 }; },
+  () => { const n = ri(2,8)*4;  return { q: `A quarter of ${n}`, a: n/4 }; },
+  () => { const n = ri(2,8)*3;  return { q: `A third of ${n}`, a: n/3 }; },
+  () => { const n = ri(15,85); return { q: `10 more than ${n}`, a: n+10 }; },
+  () => { const n = ri(25,95); return { q: `10 less than ${n}`, a: n-10 }; },
+  () => { const n = ri(21,99); return { q: `What is the tens digit in ${n}?`, a: (n/10)|0 }; },
+  () => { const s = ri(2,5), st = ri(1,6)*s;
+          return { q: `${st}, ${st+s}, ${st+2*s}, ${st+3*s}, ?`, a: st+4*s }; },
+  () => { const n = ri(11,99);
+          return { q: `Is ${n} odd or even?`, a: n%2 ? 'Odd' : 'Even', pick: ['Odd','Even'] }; },
+  () => { const c = oneOf([2,5,10,20]), n = ri(2,6);
+          return { q: `How many ${c}p coins make ${c*n}p?`, a: n }; },
+  () => { const s = oneOf([['triangle',3],['square',4],['pentagon',5],['hexagon',6],['octagon',8]]);
+          return { q: `How many sides does a ${s[0]} have?`, a: s[1] }; },
+  () => { const s = oneOf([['cube',6],['cuboid',6],['square-based pyramid',5],['triangular prism',5]]);
+          return { q: `How many faces does a ${s[0]} have?`, a: s[1] }; },
+  () => { const h = ri(1,9), d = ri(1,3);
+          return { q: `It is ${h} o'clock. In ${d} hour${d>1?'s':''} it will be ? o'clock`, a: h+d }; },
+  () => { const m = oneOf([15,30,45]);
+          return { q: `How many minutes is it from half past 2 to ${m===30?'3 o’clock':m===15?'quarter to 3':'quarter past 3'}?`,
+                   a: m===30?30:m===15?15:45 }; },
+  () => { const a = ri(9,20), b = ri(3,8);
+          return { q: `There are ${a} biscuits in a tin. ${b} are eaten. How many are left?`, a: a-b }; },
+  () => { const n = ri(3,9), k = ri(2,5);
+          return { q: `${k} baskets have ${n} eggs each. How many eggs altogether?`, a: n*k }; },
+  () => { let a = ri(10,99), b = ri(10,99); while (b === a) b = ri(10,99);
+          return { q: 'Which number is bigger?', a: String(Math.max(a,b)), pick: [String(a),String(b)] }; },
+  /* the wrong answers are built off the same two numbers so that none of them can
+     ever come out equal to the right one, whatever the draw */
+  () => { const n = ri(2,9), k = ri(2,5);
+          return { q: `${Array(k).fill(n).join(' + ')}. What is that as a times sum?`,
+                   a: `${k} × ${n}`, pick: shuffle([`${k} × ${n}`, `${k+1} × ${n}`, `${k} + ${n}`]) }; }
+];
+
+const OLDER = [
+  () => { const a = ri(3,12), b = ri(3,12); return { q: `${a} × ${b}`, a: a*b }; },
+  () => { const a = ri(3,12), b = ri(3,12); return { q: `${a*b} ÷ ${a}`, a: b }; },
+  () => { const a = ri(13,29), b = ri(3,9);  return { q: `${a} × ${b}`, a: a*b }; },
+  () => { const a = ri(125,899), b = ri(125,899); return { q: `${a} + ${b}`, a: a+b }; },
+  () => { const a = ri(420,960), b = ri(125,395); return { q: `${a} − ${b}`, a: a-b }; },
+  () => { const b = ri(3,9), n = ri(20,90);
+          return { q: `What is the remainder when ${n} is divided by ${b}?`, a: n%b }; },
+  () => { const f = oneOf(frac), m = f[1]*ri(3,12);
+          return { q: `${f[0]}/${f[1]} of ${m}`, a: f[0]*m/f[1] }; },
+  () => { const f = oneOf(frac), k = ri(2,5);
+          return { q: `${f[0]}/${f[1]} = ?/${f[1]*k}`, a: f[0]*k }; },
+  () => { const d = oneOf([5,8,9,10,12]), a = ri(1,d-2), b = ri(1,d-a);
+          return { q: `${a}/${d} + ${b}/${d} = ?/${d}`, a: a+b }; },
+  () => { const f = oneOf(frac), k = ri(2,5);
+          return { q: `Write ${f[0]*k}/${f[1]*k} in its simplest form`, a: `${f[0]}/${f[1]}`,
+                   pick: shuffle([`${f[0]}/${f[1]}`, `${f[0]*2}/${f[1]*2}`, `${f[0]+1}/${f[1]+1}`]) }; },
+  () => { const f = oneOf([[1,2,50],[1,4,25],[3,4,75],[1,5,20],[2,5,40],[3,5,60],[1,10,10],[7,10,70]]);
+          return { q: `What is ${f[0]}/${f[1]} as a percentage?`, a: f[2] }; },
+  () => { const p = oneOf([10,20,25,50,75]), n = oneOf([40,60,80,120,160,200,240,360]);
+          return { q: `${p}% of ${n}`, a: p*n/100 }; },
+  () => { const n = ri(11,99)/10; return { q: `${n} × 10`, a: +(n*10).toFixed(2) }; },
+  () => { const a = ri(11,89)/10, b = ri(11,89)/10;
+          return { q: `${a} + ${b}`, a: +(a+b).toFixed(1) }; },
+  () => { const n = ri(4,12); return { q: `${n}²`, a: n*n }; },
+  () => { const n = ri(4,12); return { q: `√${n*n}`, a: n }; },
+  () => { const n = oneOf([24,36,48,60,72,90]);
+          const yes = [], no = [];
+          for (let i=3;i<=12;i++) (n%i ? no : yes).push(i);
+          const a = oneOf(yes);
+          return { q: `Which of these is a factor of ${n}?`, a: String(a),
+                   pick: shuffle([String(a), ...someOf(no,2).map(String)]) }; },
+  () => { const p = oneOf([11,13,17,19,23,29,31,37,41,43]);
+          const no = someOf([9,15,21,25,27,33,35,39,49,51,57,91],2);
+          return { q: 'Which of these is a prime number?', a: String(p),
+                   pick: shuffle([String(p), ...no.map(String)]) }; },
+  () => { const w = ri(3,14), h = ri(3,14);
+          return { q: `A rectangle is ${w}cm by ${h}cm. What is its perimeter, in cm?`, a: 2*(w+h) }; },
+  () => { const w = ri(3,14), h = ri(3,14);
+          return { q: `A rectangle is ${w}cm by ${h}cm. What is its area, in cm²?`, a: w*h }; },
+  () => { const a = ri(30,80), b = ri(30,80);
+          return { q: `Two angles in a triangle are ${a}° and ${b}°. What is the third, in degrees?`, a: 180-a-b }; },
+  () => { const a = ri(25,155);
+          return { q: `Angles on a straight line add up to 180°. One is ${a}°. What is the other?`, a: 180-a }; },
+  () => { const h1 = ri(7,14), m1 = ri(0,11)*5, mins = oneOf([25,35,40,45,50,55,70,80,95,100]);
+          const t = h1*60 + m1 + mins;
+          return { q: `How many minutes are there between ${pad2(h1)}:${pad2(m1)} and ${pad2((t/60)|0)}:${pad2(t%60)}?`,
+                   a: mins }; },
+  () => { const a = ri(2,9), b = ri(a+1, a+12);
+          return { q: `The temperature is −${a}°C and rises by ${b}°C. What is it now, in °C?`, a: b-a }; },
+  /* nothing typed is ever a negative number: on a phone the numeric keypad has no
+     minus sign on it, and a child fighting the keyboard is not practising anything.
+     So the answer here is the rise, and the ordering below is a pair of buttons */
+  () => { const a = ri(3,9), b = ri(a+1,a+14);
+          return { q: `${neg(-a)} + ${b}`, a: b-a }; },
+  () => { let a = ri(2,12), b = ri(2,12); while (b === a) b = ri(2,12);
+          return { q: 'Which temperature is colder?', a: `−${Math.max(a,b)}°C`,
+                   pick: shuffle([`−${a}°C`, `−${b}°C`]) }; },
+  () => { const m = ri(4,12), n = oneOf([3,4]), xs = [];
+          let sum = 0;
+          for (let i=0;i<n-1;i++){ const v = m + ri(-3,3); xs.push(v); sum += v; }
+          xs.push(n*m - sum);
+          return { q: `What is the mean of ${shuffle(xs).join(', ')}?`, a: m }; },
+  () => { const a = ri(1,4), b = ri(a+1,6), k = ri(3,9);
+          return { q: `Share ${(a+b)*k} in the ratio ${a}:${b}. What is the larger share?`, a: b*k }; },
+  () => { const a = ri(2,9), b = ri(2,9), c = ri(2,9);
+          return { q: `${a} + ${b} × ${c}`, a: a + b*c }; },
+  () => { const a = ri(2,9), b = ri(2,9), c = ri(2,9);
+          return { q: `(${a} + ${b}) × ${c}`, a: (a+b)*c }; },
+  () => { const n = ri(1250,9750);
+          return { q: `Round ${n.toLocaleString('en-GB')} to the nearest 100`, a: Math.round(n/100)*100 }; },
+  () => { const r = oneOf([['IX',9],['XIV',14],['XXVII',27],['XXXIX',39],['XLII',42],['LXIV',64],['LXXXVIII',88],['XCVI',96],['CXXV',125]]);
+          return { q: `What is ${r[0]} as a number?`, a: r[1] }; },
+  () => { const s = oneOf([['cube',12],['cuboid',12],['triangular prism',9],['square-based pyramid',8],['tetrahedron',6]]);
+          return { q: `How many edges does a ${s[0]} have?`, a: s[1] }; },
+  () => { const n = ri(4,9), k = ri(3,8);
+          return { q: `${n} people each pay £${k}.50. How much is that altogether, in pounds?`, a: +(n*(k+0.5)).toFixed(2) }; }
+];
+
+/* who is playing, whose turn it is, and how they are getting on. The choice is kept
+   between visits: on a tablet that is handed to a child, being asked who you are
+   every time is one more thing between them and the game */
+const KIDS = { Bea: 10, Venus: 7 };
+const WHO_KEY = 'shapepit.who';
+let players = [], turnAt = 0, quiz = null, tries = 0;
+const tally = {};
+
+const mathCard = el('mathCard'), askEl = el('ask'), turnEl = el('turn'), markEl = el('mark'),
+      tallyEl = el('tally'), pickEl = el('pick'), entryEl = el('entry'),
+      mathInput = el('mathInput'), mathGo = el('mathGo');
+
+function setPlayers(list){
+  players = list.filter(n => KIDS[n]);
+  turnAt = Math.random() < 0.5 ? 0 : 1;      /* who goes first is not always the same */
+  for (const n of players) tally[n] = tally[n] || { right: 0, asked: 0 };
+  try { localStorage.setItem(WHO_KEY, players.join('+')); } catch (e) {}
+  for (const b of el('whoPick').children) b.classList.toggle('on', b.dataset.who === players.join('+'));
+}
+
+function showTally(){
+  const said = players.filter(n => tally[n].asked)
+                      .map(n => `${n} ${tally[n].right}/${tally[n].asked}`);
+  tallyEl.textContent = said.join('  ·  ');
+}
+
+/* the question itself, and then the pit. A wrong answer costs a second go and then
+   the answer; it never costs the round. They are here to play, and a child kept
+   from the game by a sum they cannot do learns only that maths is what stands in
+   the way of things */
+function poseQuestion(){
+  bits.length = 0;
+  startCard.hidden = true; resultCard.hidden = true; guessCard.hidden = true;
+  skipBtn.hidden = true;
+  setStatus('maths first');
+  const who = players[turnAt % players.length];
+  const bank = KIDS[who] >= 9 ? OLDER : YOUNGER;
+  quiz = bank[Math.floor(Math.random()*bank.length)]();
+  quiz.who = who;
+  tries = 0;
+  turnEl.textContent = players.length > 1 ? who + '\u2019s turn' : who;
+  askEl.textContent = quiz.q;
+  askEl.classList.toggle('wordy', quiz.q.length > 26);
+  markEl.textContent = ''; markEl.className = 'mark';
+  mathGo.hidden = true;
+  showTally();
+  if (quiz.pick){
+    entryEl.hidden = true; pickEl.hidden = false; pickEl.textContent = '';
+    for (const c of quiz.pick){
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = c;
+      b.addEventListener('click', () => answer(c, b));
+      pickEl.appendChild(b);
+    }
+  } else {
+    pickEl.hidden = true; entryEl.hidden = false;
+    mathInput.value = '';
+    /* a whole number wants the plain keypad; anything with a point in it needs the
+       one that has a point on it */
+    mathInput.inputMode = Number.isInteger(quiz.a) ? 'numeric' : 'decimal';
+  }
+  mathCard.hidden = false;
+  if (!quiz.pick && !matchMedia('(hover: none)').matches) mathInput.focus();
+}
+
+function answer(given, btn){
+  if (!quiz) return;
+  if (!btn && String(given).trim() === '') { mathInput.focus(); return; }   /* an empty
+                                     box is not a wrong answer, it is no answer yet */
+  const want = quiz.a;
+  const right = typeof want === 'number'
+    ? Math.abs(Number(given) - want) < 1e-9
+    : String(given).trim() === String(want);
+
+  if (right){
+    tally[quiz.who].asked++; tally[quiz.who].right++;
+    markEl.textContent = tries ? 'That\u2019s it.' : oneOf(['Yes.', 'That\u2019s it.', 'Spot on.', 'Correct.']);
+    markEl.className = 'mark yes';
+    entryEl.hidden = true; pickEl.hidden = true;
+    showTally();
+    quiz = null;
+    setTimeout(fallIn, 850);                   /* a beat to see it, then the pieces */
+    return;
+  }
+
+  if (++tries < 2){
+    markEl.textContent = 'Not quite \u2014 have another go.';
+    if (btn){ btn.disabled = true; }
+    else { mathInput.value = ''; mathInput.focus(); }
+    return;
+  }
+
+  markEl.textContent = `The answer is ${want}.`;
+  entryEl.hidden = true; pickEl.hidden = true;
+  tally[quiz.who].asked++;
+  showTally();
+  quiz = null;
+  mathGo.hidden = false;
+  mathGo.focus();
+}
+
+/* the round the question was standing in front of */
+function fallIn(){
+  turnAt++;
+  mathCard.hidden = true;
+  start();
+}
+
+/* and the way in: the maths if anyone is playing it, the pit if not */
+function begin(){
+  if (players.length) poseQuestion(); else start();
+}
+
+mathCard.addEventListener('submit', e => { e.preventDefault(); answer(mathInput.value, null); });
+mathGo.addEventListener('click', fallIn);
+el('mathOff').addEventListener('click', () => { setPlayers([]); fallIn(); });
+for (const b of el('whoPick').children)
+  b.addEventListener('click', () => setPlayers(b.dataset.who ? b.dataset.who.split('+') : []));
+
+try { setPlayers((localStorage.getItem(WHO_KEY) || '').split('+')); } catch (e) { setPlayers([]); }
+
+el('dropBtn').addEventListener('click', begin);
+el('againBtn').addEventListener('click', begin);
 skipBtn.addEventListener('click', () => { hurry = true; skipBtn.hidden = true; setStatus('filling'); });
 
 guessCard.addEventListener('submit', e => {
@@ -1990,6 +2305,9 @@ if (new URLSearchParams(location.search).has('debug')){
              overOne:  fell.filter(v => v > SIZE).length,
              overTwo:  fell.filter(v => v > SIZE*2).length, live };
   };
+
+  /* the question standing in front of the round, so a test can answer it */
+  window.pit.quiz = () => quiz;
 
   /* pin a round's shape, to try one kind or one size over and over */
   window.pit.force = f => { forced = f; };

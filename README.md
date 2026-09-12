@@ -23,6 +23,16 @@ it cannot be counted.
 The box that asks the question can be dragged aside by its grip, since on a full
 pit there is no corner for it that leaves the pieces clear.
 
+**Maths mode** puts a question in front of each round. Pick a player on the start
+card — or both, and they take it in turns. The two banks are pitched at the two
+people it was built for: roughly Year 3 on one side (number bonds, the 2, 5 and 10
+times tables, halving and quartering, o'clock and coins, sides and faces) and Year 6
+on the other (tables to 12, fractions of amounts, percentages, primes and factors,
+area and angles, ratio, mean, order of operations). Every question is generated
+rather than drawn from a list, so the same one does not come round twice in an
+evening, and every answer is a number or one of a few buttons — nothing to spell.
+A wrong answer costs a second go and then the answer; it never costs the round.
+
 Behind it is a small rigid-body engine: convex outlines, separating-axis tests
 clipped down to two-point contacts, and impulses that carry across the substeps of
 a frame rather than starting from nothing each one — the difference between a heap
