@@ -29,20 +29,25 @@ which a reload brings back: there is nothing on the question card offering a chi
 way past the question. The two banks are pitched at the two
 people it was built for: Year 3 on one side and Year 5 on the other.
 
-Each bank climbs, and says so. There are four levels, named: a bar across the top of
-the screen carries the level, whose it is, and how much of it is left — "Level 2 ·
-Bea", "4 more for Level 3" — and it fills as they get questions right. Finishing one
-fills the bar to the top, says "Level 3!" on the card, and throws some confetti
-before the pieces fall.
+Each of them climbs a ladder of named levels, and the game says so. A bar across the
+top of the screen carries the level, whose it is, and how much of it is left — "Level
+2 · Bea", "4 more for Level 3" — and it fills as the answers come right. Every level
+has its own colour, climbing green, teal, blue, violet, rose, gold, so which one you
+are on is something you can see across the room rather than a number to read. Every
+right answer throws a handful of confetti; finishing a level fills the bar to the
+top, says "Level 3!" on the card in that level's colour, and throws the lot.
 
-Levels cost more as they go: three right answers for Level 2, four more for Level 3,
-five more for Level 4 — twelve in all, which is a sitting rather than five minutes.
+Venus climbs her own four tiers, three right answers for Level 2 and then four and
+five. Bea's ladder has six rungs and opens on two levels of Venus's bank — the same
+sums her sister is doing, which she can do standing on her head — before starting on
+her own year at Level 3. Beginning a ten-year-old on a seven-year-old's first tier
+would be insulting rather than encouraging, so the warm-up starts a couple of tiers
+in and costs two right answers a rung rather than three.
+
 What counts is answers got right rather than questions asked, so a child who is
 struggling is not pushed up for it, and about a third of the questions come from the
-level below, so the climb is felt rather than stepped off. Level 1 is doubling, the
-two times table and ten more than; Level 4 is three-quarters of a number and the
-eight times table in one house, long multiplication, angles around a point and three
-decimal places in the other. It starts at Level 1 again each time the game is opened.
+level below, so the climb is felt rather than stepped off. It starts at Level 1 again
+each time the game is opened.
 
 Every question is generated rather than drawn from a list, so the same one does not
 come round twice in an evening, and every answer is a number or one of a few buttons
