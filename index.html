@@ -156,8 +156,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
   font-variant-numeric:tabular-nums}
 #mathGo{margin-top:14px}
 /* the shapes collected so far, and the ones still to come */
-.kinds{display:flex;gap:7px;justify-content:center;align-items:center;margin-top:14px;flex-wrap:wrap}
-.chip{flex:0 0 auto;width:28px;height:28px;opacity:.18;
+.kinds{display:flex;gap:6px;justify-content:center;align-items:center;margin-top:14px;flex-wrap:wrap}
+.chip{flex:0 0 auto;width:26px;height:26px;opacity:.18;
   transition:opacity .45s ease, transform .45s cubic-bezier(.2,1.5,.4,1)}
 .chip.got{opacity:.7}
 .chip.fresh{opacity:1;transform:scale(1.4)}
@@ -290,12 +290,17 @@ const KINDS = {
   pebble: { n:[9,13], jitter:.30, stretch:[1,1.6],   draw:'smooth', pack:.74 },
   tile:   { aspect:[1.05,2.4], round:.24,            draw:'round',  pack:.78 },
   shard:  { n:[3,5],  jitter:.55, stretch:[1,2.1],   draw:'sharp',  pack:.64 },
+  /* barely jittered, or it comes out a shard: what makes a triangle read as one is
+     that the three sides are about the same */
+  triangle:{ n:[3,3], jitter:.05, stretch:[1,1.12],  draw:'sharp',  pack:.62 },
   slab:   { n:[4,6],  jitter:.14, stretch:[1.2,2.9], draw:'sharp',  pack:.70 },
   petal:  { n:[7,9],  jitter:.24, stretch:[1.9,3.3], draw:'smooth', pack:.64 },
   plank:  { aspect:[2.4,3.8],  round:.10,            draw:'round',  pack:.60 },
   stick:  { aspect:[4.5,8],                          draw:'sharp',  pack:.46 }
 };
-const KEYS = Object.keys(KINDS);
+const KEYS = Object.keys(KINDS);   /* every kind there is; UNLOCK below puts them
+                                      in the order they are earned, and the debug
+                                      hook checks it has not missed one */
 const MAXV = 16;
 
 function hull(p){                            /* monotone chain */
@@ -2165,14 +2170,15 @@ const LADDER = {
    order runs from the rounded and well-behaved to the long and dramatic, so the
    heap visibly gets more interesting as they climb rather than merely different.
    Both ladders end with all eight, whichever length they are */
-const UNLOCK = ['ball','tile','pebble','slab','shard','petal','plank','stick'];
+const UNLOCK = ['ball','tile','pebble','triangle','slab','shard','petal','plank','stick'];
 const FREE_KINDS = 3;
-const PLURAL = { ball:'balls', tile:'tiles', pebble:'pebbles', slab:'slabs',
-                 shard:'shards', petal:'petals', plank:'planks', stick:'sticks' };
+const PLURAL = { ball:'balls', tile:'tiles', pebble:'pebbles', triangle:'triangles',
+                 slab:'slabs', shard:'shards', petal:'petals', plank:'planks',
+                 stick:'sticks' };
 /* a set tilt each, so the collection reads as a handful someone dropped rather than
    a rank of bars — and so the long ones are told apart at a glance */
-const TILT = { ball:0, tile:-0.2, pebble:0.3, slab:0.42, shard:-0.32, petal:0.14,
-               plank:-0.45, stick:0.55 };
+const TILT = { ball:0, tile:-0.2, pebble:0.3, triangle:-0.28, slab:0.42, shard:-0.32,
+               petal:0.14, plank:-0.45, stick:0.55 };
 
 function unlocked(who){
   if (!who || !LADDER[who]) return UNLOCK;   /* nobody at the card: no locks either */
@@ -2268,7 +2274,7 @@ function buildChips(){
 function paintChips(){
   if (!chipFor) return;
   const ink = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#222';
-  const px = 28, dp = Math.min(devicePixelRatio || 1, 2);
+  const px = 26, dp = Math.min(devicePixelRatio || 1, 2);
   for (const k of UNLOCK){
     const c = chipFor[k].box, tpl = chipFor[k].tpl;
     c.width = Math.round(px*dp); c.height = Math.round(px*dp);
@@ -2575,6 +2581,8 @@ if (new URLSearchParams(location.search).has('debug')){
   window.pit.bits = () => bits.length;   /* confetti in the air */
   window.pit.rungs = who => LADDER[who].length;
   window.pit.pool = who => unlocked(who).slice();
+  /* a kind left out of the unlock order would never turn up in the pit at all */
+  window.pit.covered = () => KEYS.length === UNLOCK.length && KEYS.every(k => UNLOCK.includes(k));
 
   /* pin a round's shape, to try one kind or one size over and over */
   window.pit.force = f => { forced = f; };
