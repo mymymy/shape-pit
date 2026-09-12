@@ -41,6 +41,8 @@ body{
 /* the pit by name, not every canvas on the page: the shapes collected are canvases
    too, and pinned by this they stacked up in the corner of the card */
 #pit{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+/* the new shape comes forward over everything, and answers to nothing */
+#reveal{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none;z-index:5}
 [hidden]{display:none!important}
 
 /* the heads-up layer sits over the pit and lets clicks through except on its own controls */
@@ -238,6 +240,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
     </form>
   </div>
 </div>
+
+<canvas id="reveal" hidden aria-hidden="true"></canvas>
 
 <script>
 (() => {
@@ -1801,7 +1805,7 @@ function frame(now){
   const dt = Math.min(0.1, last ? (now-last)/1000 : 1/60);
   last = now;
   const moving = phase === 'dropping' || phase === 'settling';
-  if (!moving && !bits.length && !needsDraw) return;
+  if (!moving && !bits.length && !needsDraw && !reveal) return;
   needsDraw = false;
   alpha = 1;                                 /* nothing to draw between, unless the
                                                 stepping below says otherwise */
@@ -1862,10 +1866,12 @@ function frame(now){
     }
   }
   draw();
+  drawReveal(now);
 }
 
 function start(){
   bits.length = 0;
+  stopReveal();
   startCard.hidden = true;
   resultCard.hidden = true;
   guessCard.hidden = true;
@@ -2350,6 +2356,94 @@ function showChips(who, fresh){
   kindsBox.hidden = false;
 }
 
+/* The shape a level just handed over, brought forward, turned and lit. It gets a
+   canvas of its own over the top of everything: it is the one moment in the game
+   that is purely a reward, and a chip growing by a third in a row of six is not
+   what anyone would call a fuss being made.
+
+   The glow is drawn rather than blurred — two larger copies of the same outline at
+   low opacity, under a radial wash — because what shadowBlur does with a scaled
+   transform is not the same in every browser, and this is exact everywhere */
+const REVEAL_MS = 1500;
+const revealCv = el('reveal'), revealG = revealCv.getContext('2d');
+let reveal = null;
+
+function fitReveal(){
+  revealCv.width = Math.round(W*dpr); revealCv.height = Math.round(H*dpr);
+  revealCv.style.width = W+'px'; revealCv.style.height = H+'px';
+}
+
+function startReveal(kind, lv){
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (!chipFor || !chipFor[kind]) return;
+  const tint = getComputedStyle(document.body).getPropertyValue(`--lv${lv}`).trim();
+  const r = mathCard.getBoundingClientRect();
+  /* in the clear air above the card rather than over it, so the shape and the line
+     naming it can be had at the same time. Where there is no clear air — a window
+     short enough that the card is most of it — over the card is better than half
+     off the top of the screen */
+  const R = Math.min(W,H)*0.17;
+  const roof = (ladder.hidden ? 6 : ladder.getBoundingClientRect().bottom) + 10;
+  let cy = r.height ? r.top - R*0.8 : H/2;
+  /* the shape itself has to clear the bar; the glow round it may spill over the
+     title, which is a few words at the far left and no great loss */
+  if (cy - R*0.95 < roof) cy = r.height ? r.top + r.height/2 : H/2;
+  reveal = { kind, at: performance.now(), rgb: hex(tint || '#9A6B1F'),
+             cx: r.width ? r.left + r.width/2 : W/2, cy };
+  fitReveal();
+  revealCv.hidden = false;
+}
+
+function stopReveal(){
+  reveal = null;
+  revealCv.hidden = true;
+}
+
+function drawReveal(now){
+  if (!reveal) return;
+  const t = clamp((now - reveal.at)/REVEAL_MS, 0, 1);
+  const g = revealG;
+  g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,W,H);
+  if (t >= 1){ stopReveal(); return; }
+
+  /* forward a little past its size and back, two turns slowing to a stop the right
+     way up, and a glow that breathes three times while it does it */
+  const back = x => 1 + 2.2*Math.pow(x-1,3) + 1.2*Math.pow(x-1,2);
+  const out  = x => 1 - Math.pow(1-x, 3);
+  const grow = back(Math.min(1, t/0.5));
+  const turn = out(Math.min(1, t/0.8))*(6.2832*2 + TILT[reveal.kind]);
+  const beat = 0.55 + 0.45*Math.sin(t*Math.PI*3);
+  const fade = t < 0.09 ? t/0.09 : t > 0.8 ? (1-t)/0.2 : 1;
+
+  const size = Math.min(W,H)*0.17*(0.2 + 0.8*grow);
+  const rgb = reveal.rgb, ink = a => `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`;
+  const path = chipFor[reveal.kind].tpl.path, f = size/chipFor[reveal.kind].ext;
+
+  g.globalAlpha = fade;
+  g.translate(reveal.cx, reveal.cy);
+
+  const wash = g.createRadialGradient(0,0, size*0.4, 0,0, size*2.5);
+  wash.addColorStop(0, ink(0.42*beat));
+  wash.addColorStop(0.45, ink(0.16*beat));
+  wash.addColorStop(1, ink(0));
+  g.fillStyle = wash;
+  g.fillRect(-size*2.5, -size*2.5, size*5, size*5);
+
+  g.rotate(turn);
+  for (const [k, a] of [[1.28, 0.16*beat], [1.14, 0.30*beat]]){
+    g.save(); g.scale(f*k, f*k); g.fillStyle = ink(a); g.fill(path); g.restore();
+  }
+  g.scale(f, f);
+  g.fillStyle = ink(1);
+  g.fill(path);
+  g.lineWidth = 2.5/f;
+  g.lineJoin = 'round';
+  g.strokeStyle = ink(0.3);
+  g.stroke(path);
+  g.globalAlpha = 1;
+}
+
 /* what a level just handed over, said out loud */
 function gift(list){
   if (!list.length) return '';
@@ -2404,6 +2498,7 @@ function poseQuestion(){
   askEl.textContent = quiz.q;
   askEl.classList.toggle('wordy', quiz.q.length > 26);
   markEl.textContent = ''; markEl.className = 'mark'; markEl.style.color = '';
+  stopReveal();
   mathGo.hidden = true;
   showTally();
   if (quiz.pick){
@@ -2439,23 +2534,26 @@ function answer(given, btn){
                                                   and the settling runs after that */
     const was = standing(who).lv, had = unlocked(who);
     tally[who].asked++; tally[who].right++;
-    const now = standing(who).lv, up = now > was;
+    const lv = standing(who).lv, up = lv > was;
     const won = unlocked(who).filter(k => !had.includes(k));
-    markEl.textContent = up ? `Level ${now + 1}!` + gift(won)
+    markEl.textContent = up ? `Level ${lv + 1}!` + gift(won)
                         : tries ? 'That\u2019s it.'
                         : oneOf(['Yes.', 'That\u2019s it.', 'Spot on.', 'Correct.']);
     markEl.className = 'mark yes';
-    markEl.style.color = up ? `var(--lv${now + 1})` : '';
+    markEl.style.color = up ? `var(--lv${lv + 1})` : '';
     entryEl.hidden = true; pickEl.hidden = true;
     showTally();
     showLadder(who, up);
     showChips(who, won);
-    if (won.length) setTimeout(() => showChips(who, null), 1400);   /* let it settle */
+    if (won.length){
+      startReveal(won[0], lv + 1);             /* the shape itself, brought forward */
+      setTimeout(() => showChips(who, null), 1700);   /* the chip settles after it */
+    }
     /* every right answer gets a handful; finishing a level gets the lot */
     shower(mathCard, up ? 220 : 60);
     if (up) sayTurn(who);                      /* the card says where they now are */
     quiz = null;
-    setTimeout(fallIn, up ? 1900 : 850);       /* a beat to see it, then the pieces */
+    setTimeout(fallIn, up ? 2500 : 850);       /* time to watch it, then the pieces */
     return;
   }
 
@@ -2509,7 +2607,7 @@ guessCard.addEventListener('submit', e => {
 
 /* the ground and the pit are painted from the stylesheet, so a change of theme
    means reading it again */
-const repaint = () => { fit(); paintChips(); needsDraw = true; };
+const repaint = () => { fit(); fitReveal(); paintChips(); needsDraw = true; };
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', repaint);
 new MutationObserver(repaint).observe(document.documentElement, { attributeFilter: ['data-theme'] });
 
@@ -2632,6 +2730,7 @@ if (new URLSearchParams(location.search).has('debug')){
   window.pit.covered = () => KEYS.length === UNLOCK.length && KEYS.every(k => UNLOCK.includes(k));
   window.pit.reach = who => reach(who);
   window.pit.rebuildChips = () => buildChips();   /* fresh draws of the templates */
+  window.pit.reveal = () => reveal && reveal.kind;
 
   /* pin a round's shape, to try one kind or one size over and over */
   window.pit.force = f => { forced = f; };
