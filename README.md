@@ -5,9 +5,9 @@ nothing is moving you say how many there are.
 
 **Play it: https://mymymy.github.io/shape-pit/**
 
-Every round is cut afresh: one shape or two out of balls, rounded pebbles, triangles,
-sharp shards, broad slabs, rounded tiles and planks, and sticks that come to rest
-across one another like a dropped handful — in a palette of its own each time. How big a
+Every round is cut afresh: one shape or two out of six that no child would give the
+same name — circles, triangles, rounded rectangles, lumpy pebbles, jagged shards, and
+sticks that come to rest across one another like a dropped handful — in a palette of its own each time. How big a
 piece is varies most of all, and is drawn evenly across the scales rather than
 evenly across the pixels, so the hard rounds turn up as often as the easy ones.
 
@@ -37,16 +37,19 @@ are on is something you can see across the room rather than a number to read. Ev
 right answer throws a handful of confetti; finishing a level fills the bar to the
 top, says "Level 3!" on the card in that level's colour, and throws the lot.
 
-And each level unlocks a shape. The pit starts with three in it — balls, tiles and
-pebbles, all rounded and well behaved — and the other six are earned a level at a
-time, out through triangles and slabs and shards to petals, planks and sticks, so the
-heap
-visibly gets more interesting as they climb rather than merely different. Levelling
-up says which one it was — "Level 2! Slabs unlocked." — and the round that follows is
-cut with it in. The card carries the collection as a row of little shapes, the ones
-still locked left faint, drawn out of the same templates the pit itself is cut from.
-Both ladders end with all nine, whichever length they are. With no maths on, the pit
-has all nine from the start, as it always did.
+And each level unlocks a shape. The pit begins with circles and nothing else, and
+every level adds exactly one more: triangles, then rectangles, then pebbles, then
+shards, then sticks. The card carries the collection as a row of little shapes, the
+ones still locked left faint, drawn out of the same templates the pit itself is cut
+from. Levelling up says which one it was — "Level 2! Triangles unlocked." — and the
+round that follows is cut with it in.
+
+One a level means a ladder collects as many shapes as it has rungs, so Bea's six
+reach all six and Venus's four reach the first four: circles, triangles, rectangles
+and pebbles, which are the ones she is being taught to name anyway. Her row on the
+card is four long rather than six, since a locked shape nobody can reach is not
+something to look at all evening. With no maths on, the pit has all six from the
+start, as it always did.
 
 Venus climbs her own four tiers, three right answers for Level 2 and then four and
 five. Bea's ladder has six rungs and opens on two levels of Venus's bank — the same

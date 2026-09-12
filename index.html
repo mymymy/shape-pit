@@ -285,17 +285,23 @@ function palette(){
    out sharp, some are drawn round them and come out organic; a stick is just a
    very long one. All of them are cut to the same area, so a round of sticks and
    a round of pebbles fill the pit alike */
+/* Six kinds, and no two of them read alike at a glance: a circle, a triangle, a
+   rectangle, a lump, a jagged thing and a rod. There used to be nine, but four of
+   them were rectangles of one length or another — the tile, the slab, the plank and
+   the stick — with the shard making a fifth quadrilateral, and a pit of those is
+   varied only on paper. What is left is six shapes a child would name differently */
 const KINDS = {
   ball:   { disc:16,                                 draw:'circle', pack:.76 },
-  pebble: { n:[9,13], jitter:.30, stretch:[1,1.6],   draw:'smooth', pack:.74 },
-  tile:   { aspect:[1.05,2.4], round:.24,            draw:'round',  pack:.78 },
-  shard:  { n:[3,5],  jitter:.55, stretch:[1,2.1],   draw:'sharp',  pack:.64 },
   /* barely jittered, or it comes out a shard: what makes a triangle read as one is
      that the three sides are about the same */
   triangle:{ n:[3,3], jitter:.05, stretch:[1,1.12],  draw:'sharp',  pack:.62 },
-  slab:   { n:[4,6],  jitter:.14, stretch:[1.2,2.9], draw:'sharp',  pack:.70 },
-  petal:  { n:[7,9],  jitter:.24, stretch:[1.9,3.3], draw:'smooth', pack:.64 },
-  plank:  { aspect:[2.4,3.8],  round:.10,            draw:'round',  pack:.60 },
+  tile:   { aspect:[1.05,2.4], round:.24,            draw:'round',  pack:.78 },
+  /* always somewhat long: a pebble drawn round in both directions is a rounded
+     square, which is the tile above */
+  pebble: { n:[9,13], jitter:.30, stretch:[1.3,1.8], draw:'smooth', pack:.72 },
+  /* four sides or five, never three, or it is the triangle with a wobble on it.
+     What makes it a shard is that no two sides are alike */
+  shard:  { n:[4,5],  jitter:.55, stretch:[1,2.1],   draw:'sharp',  pack:.64 },
   stick:  { aspect:[4.5,8],                          draw:'sharp',  pack:.46 }
 };
 const KEYS = Object.keys(KINDS);   /* every kind there is; UNLOCK below puts them
@@ -2170,20 +2176,24 @@ const LADDER = {
    order runs from the rounded and well-behaved to the long and dramatic, so the
    heap visibly gets more interesting as they climb rather than merely different.
    Both ladders end with all eight, whichever length they are */
-const UNLOCK = ['ball','tile','pebble','triangle','slab','shard','petal','plank','stick'];
-const FREE_KINDS = 3;
-const PLURAL = { ball:'balls', tile:'tiles', pebble:'pebbles', triangle:'triangles',
-                 slab:'slabs', shard:'shards', petal:'petals', plank:'planks',
-                 stick:'sticks' };
+const UNLOCK = ['ball','triangle','tile','pebble','shard','stick'];
+const FREE_KINDS = 1;      /* circles, and nothing else, until a level is won */
+const PLURAL = { ball:'circles', triangle:'triangles', tile:'rectangles',
+                 pebble:'pebbles', shard:'shards', stick:'sticks' };
 /* a set tilt each, so the collection reads as a handful someone dropped rather than
    a rank of bars — and so the long ones are told apart at a glance */
-const TILT = { ball:0, tile:-0.2, pebble:0.3, triangle:-0.28, slab:0.42, shard:-0.32,
-               petal:0.14, plank:-0.45, stick:0.55 };
+const TILT = { ball:0, triangle:-0.28, tile:-0.2, pebble:0.3, shard:0.42, stick:0.55 };
 
 function unlocked(who){
   if (!who || !LADDER[who]) return UNLOCK;   /* nobody at the card: no locks either */
-  const st = standing(who), rungs = st.levels - 1, span = UNLOCK.length - FREE_KINDS;
-  return UNLOCK.slice(0, FREE_KINDS + (rungs > 0 ? Math.round(st.lv/rungs*span) : span));
+  return UNLOCK.slice(0, Math.min(UNLOCK.length, FREE_KINDS + standing(who).lv));
+}
+
+/* how many of them this ladder can reach at all: one a level, so a four-level
+   climb collects four. The row on the card is that long rather than always six —
+   a locked shape nobody can get to is not something to look at all evening */
+function reach(who){
+  return Math.min(UNLOCK.length, FREE_KINDS + (LADDER[who] ? LADDER[who].length - 1 : 0));
 }
 /* what each rung costs in right answers. They cost more as they go, so the warm-up
    is a warm-up and the top of the ladder is worth getting to */
@@ -2265,7 +2275,14 @@ function buildChips(){
     const c = document.createElement('canvas');
     c.className = 'chip';
     c.title = PLURAL[k];
-    chipFor[k] = { box: c, tpl: template(k, 300, 0.5) };
+    const tpl = template(k, 300, 0.5);
+    /* how far it actually reaches, rather than how far its corners are from the
+       middle: a triangle's corner is a long way out and its sides are not, so fitted
+       by the corner it sits in the chip looking half the size of everything else */
+    let ext = 0;
+    for (let i=0;i<tpl.count;i++)
+      ext = Math.max(ext, Math.abs(tpl.v[i*2]), Math.abs(tpl.v[i*2+1]));
+    chipFor[k] = { box: c, tpl, ext: ext || tpl.bound };
     kindsBox.appendChild(c);
   }
   paintChips();
@@ -2282,7 +2299,7 @@ function paintChips(){
     g.setTransform(dp,0,0,dp,0,0);
     g.translate(px/2, px/2);
     g.rotate(TILT[k]);
-    const f = (px/2 - 1.5)/tpl.bound;        /* a stick and a ball are the same area,
+    const f = (px/2 - 1.5)/chipFor[k].ext;   /* a stick and a ball are the same area,
                                                 so each is fitted to the chip by its
                                                 own reach rather than by that */
     g.scale(f, f);
@@ -2299,11 +2316,13 @@ function paintChips(){
 
 function showChips(who, fresh){
   if (!players.length || !who || !chipFor){ kindsBox.hidden = true; return; }
-  const got = new Set(unlocked(who));
-  for (const k of UNLOCK){
-    chipFor[k].box.classList.toggle('got', got.has(k));
-    chipFor[k].box.classList.toggle('fresh', !!fresh && fresh.includes(k));
-  }
+  const got = new Set(unlocked(who)), far = reach(who);
+  UNLOCK.forEach((k, i) => {
+    const c = chipFor[k].box;
+    c.hidden = i >= far;                     /* not on this ladder at all */
+    c.classList.toggle('got', got.has(k));
+    c.classList.toggle('fresh', !!fresh && fresh.includes(k));
+  });
   kindsBox.hidden = false;
 }
 
@@ -2583,6 +2602,8 @@ if (new URLSearchParams(location.search).has('debug')){
   window.pit.pool = who => unlocked(who).slice();
   /* a kind left out of the unlock order would never turn up in the pit at all */
   window.pit.covered = () => KEYS.length === UNLOCK.length && KEYS.every(k => UNLOCK.includes(k));
+  window.pit.reach = who => reach(who);
+  window.pit.rebuildChips = () => buildChips();   /* fresh draws of the templates */
 
   /* pin a round's shape, to try one kind or one size over and over */
   window.pit.force = f => { forced = f; };
