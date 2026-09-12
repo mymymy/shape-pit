@@ -25,13 +25,23 @@ pit there is no corner for it that leaves the pieces clear.
 
 **Maths mode** puts a question in front of each round. Pick a player on the start
 card — or both, and they take it in turns. The two banks are pitched at the two
-people it was built for: roughly Year 3 on one side (number bonds, the 2, 5 and 10
-times tables, halving and quartering, o'clock and coins, sides and faces) and Year 6
-on the other (tables to 12, fractions of amounts, percentages, primes and factors,
-area and angles, ratio, mean, order of operations). Every question is generated
-rather than drawn from a list, so the same one does not come round twice in an
-evening, and every answer is a number or one of a few buttons — nothing to spell.
-A wrong answer costs a second go and then the answer; it never costs the round.
+people it was built for: Year 3 on one side and Year 5 on the other.
+
+Each bank climbs. It opens on the easiest tier — doubling, the two times table, ten
+more than — and a new tier comes into play every third right answer, up to four:
+three-quarters of a number and the eight times table at one end of the house, long
+multiplication, angles around a point and three-place decimals at the other. What
+unlocks a tier is answers got right rather than questions asked, so a child who is
+struggling is not pushed up for it, and about a third of the questions come from the
+tier below, so the climb is felt rather than stepped off. It starts easy again each
+time the game is opened.
+
+Every question is generated rather than drawn from a list, so the same one does not
+come round twice in an evening, and every answer is a number or one of a few buttons
+— nothing to spell. Nothing typed is ever a negative number either: a phone's
+numeric keypad has no minus sign on it, and a child fighting the keyboard is not
+practising anything. A wrong answer costs a second go and then the answer; it never
+costs the round.
 
 Behind it is a small rigid-body engine: convex outlines, separating-axis tests
 clipped down to two-point contacts, and impulses that carry across the substeps of

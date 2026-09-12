@@ -1925,13 +1925,22 @@ asker.addEventListener('click', e => {
 
 /* ------------------------------------------------------------ maths mode */
 /* A question before the pieces fall. Two banks, pitched at the two people who play
-   it: roughly Year 3 for the seven-year-old and Year 6 for the ten-year-old, which
-   is about where the curriculum puts number bonds and halving on one side, and
-   fractions of amounts, percentages and long multiplication on the other.
+   it: Year 3 for the seven-year-old and Year 5 for the ten — number bonds, the
+   early times tables and halving on one side; tables to twelve, fractions of
+   amounts, long multiplication and angles on the other.
 
    Every question is generated rather than listed, so the same one does not come
    round twice in an evening, and every answer is a number or one of a few buttons —
-   nothing to spell, nothing to get wrong for the wrong reason */
+   nothing to spell, nothing to get wrong for the wrong reason. Nothing typed is
+   ever negative either: a phone's numeric keypad has no minus sign on it, and a
+   child fighting the keyboard is not practising anything */
+/* Each bank is a set of tiers rather than a flat list, and a round is drawn from
+   the highest tier unlocked — mostly, with a third of them from the tier below, so
+   the climb is felt rather than stepped off. What unlocks a tier is answers got
+   right, not questions asked: a child who is struggling is not pushed up for it */
+const STEP_UP = 3;         /* right answers before the next tier comes into play */
+const EASE_OFF = 0.35;     /* how often it drops back a tier for one */
+
 const ri = (lo,hi) => lo + Math.floor(Math.random()*(hi-lo+1));
 const oneOf = a => a[Math.floor(Math.random()*a.length)];
 const someOf = (a,n) => shuffle(a.slice()).slice(0,n);
@@ -1939,128 +1948,177 @@ const pad2 = n => String(n).padStart(2,'0');
 const neg = n => (n < 0 ? '−' : '') + Math.abs(n);
 const frac = [[1,2],[1,3],[2,3],[1,4],[3,4],[1,5],[2,5],[3,5],[4,5],[1,6],[5,6],[3,8],[5,8],[3,10],[7,10]];
 
+/* Venus, seven: Year 3 */
 const YOUNGER = [
-  () => { const a = ri(11,49), b = ri(11,49); return { q: `${a} + ${b}`, a: a+b }; },
-  () => { const a = ri(24,68), b = ri(3,21); return { q: `${a} − ${b}`, a: a-b }; },
-  () => { const a = ri(1,9);  return { q: `${a} + ? = 10`, a: 10-a }; },
-  () => { const a = ri(1,19); return { q: `${a} + ? = 20`, a: 20-a }; },
-  () => { const a = ri(1,9)*10; return { q: `${a} + ? = 100`, a: 100-a }; },
-  () => { const t = oneOf([2,5,10]), n = ri(2,12); return { q: `${n} × ${t}`, a: n*t }; },
-  () => { const t = oneOf([2,5,10]), n = ri(2,12); return { q: `${n*t} ÷ ${t}`, a: n }; },
-  () => { const t = oneOf([3,4]), n = ri(2,10);    return { q: `${n} × ${t}`, a: n*t }; },
-  () => { const n = ri(6,25); return { q: `Double ${n}`, a: n*2 }; },
-  () => { const n = ri(4,25)*2; return { q: `Half of ${n}`, a: n/2 }; },
-  () => { const n = ri(2,8)*4;  return { q: `A quarter of ${n}`, a: n/4 }; },
-  () => { const n = ri(2,8)*3;  return { q: `A third of ${n}`, a: n/3 }; },
-  () => { const n = ri(15,85); return { q: `10 more than ${n}`, a: n+10 }; },
-  () => { const n = ri(25,95); return { q: `10 less than ${n}`, a: n-10 }; },
-  () => { const n = ri(21,99); return { q: `What is the tens digit in ${n}?`, a: (n/10)|0 }; },
-  () => { const s = ri(2,5), st = ri(1,6)*s;
-          return { q: `${st}, ${st+s}, ${st+2*s}, ${st+3*s}, ?`, a: st+4*s }; },
-  () => { const n = ri(11,99);
-          return { q: `Is ${n} odd or even?`, a: n%2 ? 'Odd' : 'Even', pick: ['Odd','Even'] }; },
-  () => { const c = oneOf([2,5,10,20]), n = ri(2,6);
-          return { q: `How many ${c}p coins make ${c*n}p?`, a: n }; },
-  () => { const s = oneOf([['triangle',3],['square',4],['pentagon',5],['hexagon',6],['octagon',8]]);
-          return { q: `How many sides does a ${s[0]} have?`, a: s[1] }; },
-  () => { const s = oneOf([['cube',6],['cuboid',6],['square-based pyramid',5],['triangular prism',5]]);
-          return { q: `How many faces does a ${s[0]} have?`, a: s[1] }; },
-  () => { const h = ri(1,9), d = ri(1,3);
-          return { q: `It is ${h} o'clock. In ${d} hour${d>1?'s':''} it will be ? o'clock`, a: h+d }; },
-  () => { const m = oneOf([15,30,45]);
-          return { q: `How many minutes is it from half past 2 to ${m===30?'3 o’clock':m===15?'quarter to 3':'quarter past 3'}?`,
-                   a: m===30?30:m===15?15:45 }; },
-  () => { const a = ri(9,20), b = ri(3,8);
-          return { q: `There are ${a} biscuits in a tin. ${b} are eaten. How many are left?`, a: a-b }; },
-  () => { const n = ri(3,9), k = ri(2,5);
-          return { q: `${k} baskets have ${n} eggs each. How many eggs altogether?`, a: n*k }; },
-  () => { let a = ri(10,99), b = ri(10,99); while (b === a) b = ri(10,99);
-          return { q: 'Which number is bigger?', a: String(Math.max(a,b)), pick: [String(a),String(b)] }; },
-  /* the wrong answers are built off the same two numbers so that none of them can
-     ever come out equal to the right one, whatever the draw */
-  () => { const n = ri(2,9), k = ri(2,5);
-          return { q: `${Array(k).fill(n).join(' + ')}. What is that as a times sum?`,
-                   a: `${k} × ${n}`, pick: shuffle([`${k} × ${n}`, `${k+1} × ${n}`, `${k} + ${n}`]) }; }
+  [ /* first steps */
+    () => { const a = ri(1,9); return { q: `${a} + ? = 10`, a: 10-a }; },
+    () => { const n = ri(4,12); return { q: `Double ${n}`, a: n*2 }; },
+    () => { const n = ri(15,85); return { q: `10 more than ${n}`, a: n+10 }; },
+    () => { const n = ri(25,95); return { q: `10 less than ${n}`, a: n-10 }; },
+    () => { const n = ri(2,10); return { q: `${n} × 2`, a: n*2 }; },
+    () => { const n = ri(2,10); return { q: `${n} × 10`, a: n*10 }; },
+    () => { const a = ri(11,40), b = ri(2,9); return { q: `${a} + ${b}`, a: a+b }; },
+    () => { const n = ri(11,99); return { q: `Is ${n} odd or even?`, a: n%2 ? 'Odd' : 'Even', pick: ['Odd','Even'] }; },
+    () => { const s = oneOf([['triangle',3],['square',4],['pentagon',5],['hexagon',6]]);
+            return { q: `How many sides does a ${s[0]} have?`, a: s[1] }; },
+    () => { let a = ri(10,99), b = ri(10,99); while (b === a) b = ri(10,99);
+            return { q: 'Which number is bigger?', a: String(Math.max(a,b)), pick: [String(a),String(b)] }; },
+    () => { const h = ri(1,9), d = ri(1,2);
+            return { q: `It is ${h} o’clock. In ${d} hour${d>1?'s':''} it will be ? o’clock`, a: h+d }; },
+    () => { const n = ri(21,99); return { q: `What is the tens digit in ${n}?`, a: (n/10)|0 }; }
+  ],
+  [ /* getting going */
+    () => { const a = ri(1,19); return { q: `${a} + ? = 20`, a: 20-a }; },
+    () => { const a = ri(11,49), b = ri(11,49); return { q: `${a} + ${b}`, a: a+b }; },
+    () => { const a = ri(24,68), b = ri(3,19); return { q: `${a} − ${b}`, a: a-b }; },
+    () => { const n = ri(2,12); return { q: `${n} × 5`, a: n*5 }; },
+    () => { const t = oneOf([2,10]), n = ri(2,12); return { q: `${n*t} ÷ ${t}`, a: n }; },
+    () => { const n = ri(4,25)*2; return { q: `Half of ${n}`, a: n/2 }; },
+    () => { const c = oneOf([2,5,10]), n = ri(3,6); return { q: `How many ${c}p coins make ${c*n}p?`, a: n }; },
+    () => { const s = oneOf([['cube',6],['cuboid',6],['square-based pyramid',5],['triangular prism',5]]);
+            return { q: `How many faces does a ${s[0]} have?`, a: s[1] }; },
+    () => { const n = ri(3,9), k = ri(2,5);
+            return { q: `${k} baskets have ${n} eggs each. How many eggs altogether?`, a: n*k }; },
+    () => { const a = ri(9,20), b = ri(3,8);
+            return { q: `There are ${a} biscuits in a tin. ${b} are eaten. How many are left?`, a: a-b }; }
+  ],
+  [ /* on a roll */
+    () => { const a = ri(1,9)*10; return { q: `${a} + ? = 100`, a: 100-a }; },
+    () => { const t = oneOf([3,4]), n = ri(2,12); return { q: `${n} × ${t}`, a: n*t }; },
+    () => { const n = ri(2,12); return { q: `${n*5} ÷ 5`, a: n }; },
+    () => { const n = ri(2,8)*4; return { q: `A quarter of ${n}`, a: n/4 }; },
+    () => { const n = ri(2,8)*3; return { q: `A third of ${n}`, a: n/3 }; },
+    () => { const s = ri(2,5), st = ri(1,6)*s;
+            return { q: `${st}, ${st+s}, ${st+2*s}, ${st+3*s}, ?`, a: st+4*s }; },
+    () => { const n = ri(2,9), k = ri(2,5);
+            return { q: `${Array(k).fill(n).join(' + ')}. What is that as a times sum?`,
+                     a: `${k} × ${n}`, pick: shuffle([`${k} × ${n}`, `${k+1} × ${n}`, `${k} + ${n}`]) }; },
+    () => { const m = oneOf([15,30,45]);
+            return { q: `How many minutes is it from half past 2 to ${m===30?'3 o’clock':m===15?'quarter to 3':'quarter past 3'}?`,
+                     a: m===30?30:m===15?15:45 }; }
+  ],
+  [ /* the hard end */
+    () => { const a = ri(45,89), b = ri(45,89); return { q: `${a} + ${b}`, a: a+b }; },
+    () => { const a = ri(60,98), b = ri(22,55); return { q: `${a} − ${b}`, a: a-b }; },
+    () => { const n = ri(2,12); return { q: `${n} × 8`, a: n*8 }; },
+    () => { const t = oneOf([3,4]), n = ri(2,12); return { q: `${n*t} ÷ ${t}`, a: n }; },
+    () => { const t = oneOf([2,3,4,5,10]), n = ri(2,12);
+            return { q: `? × ${t} = ${n*t}`, a: n }; },
+    () => { const n = ri(3,8)*4; return { q: `Three quarters of ${n}`, a: n/4*3 }; },
+    () => { const s = ri(3,8), st = ri(2,9)*s;
+            return { q: `${st+4*s}, ${st+3*s}, ${st+2*s}, ${st+s}, ?`, a: st }; },
+    () => { const p = ri(3,6), c = ri(2,4), e = ri(2,6);
+            return { q: `${p} bags hold ${c} apples each. ${e} apples are eaten. How many are left?`, a: p*c-e }; }
+  ]
 ];
 
+/* Bea, ten: Year 5 */
 const OLDER = [
-  () => { const a = ri(3,12), b = ri(3,12); return { q: `${a} × ${b}`, a: a*b }; },
-  () => { const a = ri(3,12), b = ri(3,12); return { q: `${a*b} ÷ ${a}`, a: b }; },
-  () => { const a = ri(13,29), b = ri(3,9);  return { q: `${a} × ${b}`, a: a*b }; },
-  () => { const a = ri(125,899), b = ri(125,899); return { q: `${a} + ${b}`, a: a+b }; },
-  () => { const a = ri(420,960), b = ri(125,395); return { q: `${a} − ${b}`, a: a-b }; },
-  () => { const b = ri(3,9), n = ri(20,90);
-          return { q: `What is the remainder when ${n} is divided by ${b}?`, a: n%b }; },
-  () => { const f = oneOf(frac), m = f[1]*ri(3,12);
-          return { q: `${f[0]}/${f[1]} of ${m}`, a: f[0]*m/f[1] }; },
-  () => { const f = oneOf(frac), k = ri(2,5);
-          return { q: `${f[0]}/${f[1]} = ?/${f[1]*k}`, a: f[0]*k }; },
-  () => { const d = oneOf([5,8,9,10,12]), a = ri(1,d-2), b = ri(1,d-a);
-          return { q: `${a}/${d} + ${b}/${d} = ?/${d}`, a: a+b }; },
-  () => { const f = oneOf(frac), k = ri(2,5);
-          return { q: `Write ${f[0]*k}/${f[1]*k} in its simplest form`, a: `${f[0]}/${f[1]}`,
-                   pick: shuffle([`${f[0]}/${f[1]}`, `${f[0]*2}/${f[1]*2}`, `${f[0]+1}/${f[1]+1}`]) }; },
-  () => { const f = oneOf([[1,2,50],[1,4,25],[3,4,75],[1,5,20],[2,5,40],[3,5,60],[1,10,10],[7,10,70]]);
-          return { q: `What is ${f[0]}/${f[1]} as a percentage?`, a: f[2] }; },
-  () => { const p = oneOf([10,20,25,50,75]), n = oneOf([40,60,80,120,160,200,240,360]);
-          return { q: `${p}% of ${n}`, a: p*n/100 }; },
-  () => { const n = ri(11,99)/10; return { q: `${n} × 10`, a: +(n*10).toFixed(2) }; },
-  () => { const a = ri(11,89)/10, b = ri(11,89)/10;
-          return { q: `${a} + ${b}`, a: +(a+b).toFixed(1) }; },
-  () => { const n = ri(4,12); return { q: `${n}²`, a: n*n }; },
-  () => { const n = ri(4,12); return { q: `√${n*n}`, a: n }; },
-  () => { const n = oneOf([24,36,48,60,72,90]);
-          const yes = [], no = [];
-          for (let i=3;i<=12;i++) (n%i ? no : yes).push(i);
-          const a = oneOf(yes);
-          return { q: `Which of these is a factor of ${n}?`, a: String(a),
-                   pick: shuffle([String(a), ...someOf(no,2).map(String)]) }; },
-  () => { const p = oneOf([11,13,17,19,23,29,31,37,41,43]);
-          const no = someOf([9,15,21,25,27,33,35,39,49,51,57,91],2);
-          return { q: 'Which of these is a prime number?', a: String(p),
-                   pick: shuffle([String(p), ...no.map(String)]) }; },
-  () => { const w = ri(3,14), h = ri(3,14);
-          return { q: `A rectangle is ${w}cm by ${h}cm. What is its perimeter, in cm?`, a: 2*(w+h) }; },
-  () => { const w = ri(3,14), h = ri(3,14);
-          return { q: `A rectangle is ${w}cm by ${h}cm. What is its area, in cm²?`, a: w*h }; },
-  () => { const a = ri(30,80), b = ri(30,80);
-          return { q: `Two angles in a triangle are ${a}° and ${b}°. What is the third, in degrees?`, a: 180-a-b }; },
-  () => { const a = ri(25,155);
-          return { q: `Angles on a straight line add up to 180°. One is ${a}°. What is the other?`, a: 180-a }; },
-  () => { const h1 = ri(7,14), m1 = ri(0,11)*5, mins = oneOf([25,35,40,45,50,55,70,80,95,100]);
-          const t = h1*60 + m1 + mins;
-          return { q: `How many minutes are there between ${pad2(h1)}:${pad2(m1)} and ${pad2((t/60)|0)}:${pad2(t%60)}?`,
-                   a: mins }; },
-  () => { const a = ri(2,9), b = ri(a+1, a+12);
-          return { q: `The temperature is −${a}°C and rises by ${b}°C. What is it now, in °C?`, a: b-a }; },
-  /* nothing typed is ever a negative number: on a phone the numeric keypad has no
-     minus sign on it, and a child fighting the keyboard is not practising anything.
-     So the answer here is the rise, and the ordering below is a pair of buttons */
-  () => { const a = ri(3,9), b = ri(a+1,a+14);
-          return { q: `${neg(-a)} + ${b}`, a: b-a }; },
-  () => { let a = ri(2,12), b = ri(2,12); while (b === a) b = ri(2,12);
-          return { q: 'Which temperature is colder?', a: `−${Math.max(a,b)}°C`,
-                   pick: shuffle([`−${a}°C`, `−${b}°C`]) }; },
-  () => { const m = ri(4,12), n = oneOf([3,4]), xs = [];
-          let sum = 0;
-          for (let i=0;i<n-1;i++){ const v = m + ri(-3,3); xs.push(v); sum += v; }
-          xs.push(n*m - sum);
-          return { q: `What is the mean of ${shuffle(xs).join(', ')}?`, a: m }; },
-  () => { const a = ri(1,4), b = ri(a+1,6), k = ri(3,9);
-          return { q: `Share ${(a+b)*k} in the ratio ${a}:${b}. What is the larger share?`, a: b*k }; },
-  () => { const a = ri(2,9), b = ri(2,9), c = ri(2,9);
-          return { q: `${a} + ${b} × ${c}`, a: a + b*c }; },
-  () => { const a = ri(2,9), b = ri(2,9), c = ri(2,9);
-          return { q: `(${a} + ${b}) × ${c}`, a: (a+b)*c }; },
-  () => { const n = ri(1250,9750);
-          return { q: `Round ${n.toLocaleString('en-GB')} to the nearest 100`, a: Math.round(n/100)*100 }; },
-  () => { const r = oneOf([['IX',9],['XIV',14],['XXVII',27],['XXXIX',39],['XLII',42],['LXIV',64],['LXXXVIII',88],['XCVI',96],['CXXV',125]]);
-          return { q: `What is ${r[0]} as a number?`, a: r[1] }; },
-  () => { const s = oneOf([['cube',12],['cuboid',12],['triangular prism',9],['square-based pyramid',8],['tetrahedron',6]]);
-          return { q: `How many edges does a ${s[0]} have?`, a: s[1] }; },
-  () => { const n = ri(4,9), k = ri(3,8);
-          return { q: `${n} people each pay £${k}.50. How much is that altogether, in pounds?`, a: +(n*(k+0.5)).toFixed(2) }; }
+  [ /* first steps */
+    () => { const a = ri(2,6), b = ri(2,12); return { q: `${a} × ${b}`, a: a*b }; },
+    () => { const a = ri(2,6), b = ri(2,12); return { q: `${a*b} ÷ ${a}`, a: b }; },
+    () => { const n = ri(12,98); return { q: `${n} × 10`, a: n*10 }; },
+    () => { const n = ri(12,98); return { q: `${n*10} ÷ 10`, a: n }; },
+    () => { const n = ri(23,97); return { q: `Round ${n} to the nearest 10`, a: Math.round(n/10)*10 }; },
+    () => { const n = ri(2,9); return { q: `${n}²`, a: n*n }; },
+    () => { const n = ri(2,9)*10; return { q: `10% of ${n*10}`, a: n }; },
+    () => { const n = ri(3,24)*2; return { q: `Half of ${n}`, a: n/2 }; },
+    () => { const n = ri(12,89); return { q: `100 − ${n}`, a: 100-n }; },
+    () => { const s = oneOf([['pentagon',5],['hexagon',6],['heptagon',7],['octagon',8],['decagon',10]]);
+            return { q: `How many sides does a ${s[0]} have?`, a: s[1] }; }
+  ],
+  [ /* getting going */
+    () => { const a = ri(3,12), b = ri(3,12); return { q: `${a} × ${b}`, a: a*b }; },
+    () => { const a = ri(3,12), b = ri(3,12); return { q: `${a*b} ÷ ${a}`, a: b }; },
+    () => { const n = ri(12,98); return { q: `${n} × 100`, a: n*100 }; },
+    () => { const n = ri(12,98); return { q: `${n*100} ÷ 100`, a: n }; },
+    () => { const a = ri(125,899), b = ri(125,899); return { q: `${a} + ${b}`, a: a+b }; },
+    () => { const a = ri(420,960), b = ri(125,395); return { q: `${a} − ${b}`, a: a-b }; },
+    () => { const b = ri(3,9), n = ri(20,90);
+            return { q: `What is the remainder when ${n} is divided by ${b}?`, a: n%b }; },
+    () => { const p = oneOf([25,50]), n = oneOf([40,60,80,120,160,200,240]);
+            return { q: `${p}% of ${n}`, a: p*n/100 }; },
+    () => { const f = oneOf(frac), k = ri(2,4);
+            return { q: `${f[0]}/${f[1]} = ?/${f[1]*k}`, a: f[0]*k }; },
+    () => { const w = ri(3,14), h = ri(3,14);
+            return { q: `A rectangle is ${w}cm by ${h}cm. What is its perimeter, in cm?`, a: 2*(w+h) }; },
+    () => { const r = oneOf([['IX',9],['XIV',14],['XXVII',27],['XXXIX',39],['XLII',42]]);
+            return { q: `What is ${r[0]} as a number?`, a: r[1] }; },
+    () => { const a = ri(2,9), b = ri(a+1,a+14);
+            return { q: `The temperature is −${a}°C and rises by ${b}°C. What is it now, in °C?`, a: b-a }; }
+  ],
+  [ /* on a roll */
+    () => { const a = ri(13,29), b = ri(3,9); return { q: `${a} × ${b}`, a: a*b }; },
+    () => { const a = ri(1250,8900), b = ri(1250,8900); return { q: `${a} + ${b}`, a: a+b }; },
+    () => { const a = ri(4200,9600), b = ri(1250,3950); return { q: `${a} − ${b}`, a: a-b }; },
+    () => { const n = ri(12,98); return { q: `${n*1000} ÷ 1000`, a: n }; },
+    () => { const f = oneOf(frac), m = f[1]*ri(3,12);
+            return { q: `${f[0]}/${f[1]} of ${m}`, a: f[0]*m/f[1] }; },
+    () => { const d = oneOf([5,8,9,10,12]), a = ri(1,d-2), b = ri(1,d-a);
+            return { q: `${a}/${d} + ${b}/${d} = ?/${d}`, a: a+b }; },
+    () => { const w = ri(3,14), h = ri(3,14);
+            return { q: `A rectangle is ${w}cm by ${h}cm. What is its area, in cm²?`, a: w*h }; },
+    () => { const a = ri(25,155);
+            return { q: `Angles on a straight line add up to 180°. One is ${a}°. What is the other?`, a: 180-a }; },
+    () => { const p = oneOf([2,3,5,7,11,13,17,19]);
+            const no = someOf([9,15,21,25,27,33,35,39,49,51,57,91],2);
+            return { q: 'Which of these is a prime number?', a: String(p),
+                     pick: shuffle([String(p), ...no.map(String)]) }; },
+    () => { const n = oneOf([24,36,48,60,72,90]);
+            const yes = [], no = [];
+            for (let i=3;i<=12;i++) (n%i ? no : yes).push(i);
+            const a = oneOf(yes);
+            return { q: `Which of these is a factor of ${n}?`, a: String(a),
+                     pick: shuffle([String(a), ...someOf(no,2).map(String)]) }; },
+    () => { const n = ri(1250,9750);
+            return { q: `Round ${n.toLocaleString('en-GB')} to the nearest 1000`, a: Math.round(n/1000)*1000 }; },
+    () => { const n = ri(2,6); return { q: `${n}³`, a: n*n*n }; },
+    () => { const u = oneOf([['metres','centimetres',100],['kilograms','grams',1000],['litres','millilitres',1000]]);
+            const n = (ri(1,8)*10 + ri(1,9))/10;   /* always a tenth on it, or the
+                                                      conversion is not one */
+            return { q: `How many ${u[1]} are there in ${n} ${u[0]}?`, a: Math.round(n*u[2]) }; }
+  ],
+  [ /* the hard end */
+    () => { const a = ri(12,29), b = ri(12,29); return { q: `${a} × ${b}`, a: a*b }; },
+    () => { const d = ri(3,9), w = ri(2,6), n = ri(1,d-1);
+            return { q: `How many whole ones are there in ${w*d+n}/${d}?`, a: w }; },
+    () => { const f = oneOf(frac), k = ri(2,5);
+            return { q: `Write ${f[0]*k}/${f[1]*k} in its simplest form`, a: `${f[0]}/${f[1]}`,
+                     pick: shuffle([`${f[0]}/${f[1]}`, `${f[0]*2}/${f[1]*2}`, `${f[0]+1}/${f[1]+1}`]) }; },
+    () => { const f = oneOf([[1,2,50],[1,4,25],[3,4,75],[1,5,20],[2,5,40],[3,5,60],[1,10,10],[7,10,70]]);
+            return { q: `What is ${f[0]}/${f[1]} as a percentage?`, a: f[2] }; },
+    () => { const p = oneOf([20,75]), n = oneOf([40,60,80,120,160,200,240,360]);
+            return { q: `${p}% of ${n}`, a: p*n/100 }; },
+    () => { const d = oneOf([3,4,5,8,10]), n = ri(1,d-1), k = ri(2,5);
+            return { q: `${n}/${d} × ${k} = ?/${d}`, a: n*k }; },
+    () => { const a = ri(60,110), b = ri(60,110), c = ri(40,100);
+            return { q: `Angles around a point add up to 360°. Three are ${a}°, ${b}° and ${c}°. What is the fourth?`,
+                     a: 360-a-b-c }; },
+    () => { const a = ri(101,899)/1000, b = ri(1,9)/10;
+            return { q: `${a} + ${b}`, a: +(a+b).toFixed(3) }; },
+    () => { const h1 = ri(7,14), m1 = ri(0,11)*5, mins = oneOf([25,35,40,45,50,55,70,80,95,100]);
+            const t = h1*60 + m1 + mins;
+            return { q: `How many minutes are there between ${pad2(h1)}:${pad2(m1)} and ${pad2((t/60)|0)}:${pad2(t%60)}?`,
+                     a: mins }; },
+    () => { const r = oneOf([['LXIV',64],['LXXXVIII',88],['XCVI',96],['CXXV',125],['CDXL',440],['DCCLX',760],['CMXC',990]]);
+            return { q: `What is ${r[0]} as a number?`, a: r[1] }; },
+    () => { const s = oneOf([['cube',12],['cuboid',12],['triangular prism',9],['square-based pyramid',8],['tetrahedron',6]]);
+            return { q: `How many edges does a ${s[0]} have?`, a: s[1] }; },
+    () => { const n = ri(4,12); return { q: `√${n*n}`, a: n }; },
+    () => { const n = ri(4,9), k = ri(3,8);
+            return { q: `${n} people each pay £${k}.50. How much is that altogether, in pounds?`, a: +(n*(k+0.5)).toFixed(2) }; }
+  ]
 ];
+
+/* the question in front of this round, pitched by how many this player has had right */
+function drawQuestion(who){
+  const bank = KIDS[who] >= 9 ? OLDER : YOUNGER;
+  const top = Math.min(bank.length - 1, Math.floor(tally[who].right / STEP_UP));
+  const tier = bank[top > 0 && Math.random() < EASE_OFF ? top - 1 : top];
+  const out = tier[Math.floor(Math.random()*tier.length)]();
+  out.tier = top;
+  return out;
+}
 
 /* who is playing, whose turn it is, and how they are getting on. The choice is kept
    between visits: on a tablet that is handed to a child, being asked who you are
@@ -2098,8 +2156,7 @@ function poseQuestion(){
   skipBtn.hidden = true;
   setStatus('maths first');
   const who = players[turnAt % players.length];
-  const bank = KIDS[who] >= 9 ? OLDER : YOUNGER;
-  quiz = bank[Math.floor(Math.random()*bank.length)]();
+  quiz = drawQuestion(who);
   quiz.who = who;
   tries = 0;
   turnEl.textContent = players.length > 1 ? who + '\u2019s turn' : who;
@@ -2306,8 +2363,12 @@ if (new URLSearchParams(location.search).has('debug')){
              overTwo:  fell.filter(v => v > SIZE*2).length, live };
   };
 
-  /* the question standing in front of the round, so a test can answer it */
+  /* the question standing in front of the round, so a test can answer it, and the
+     draw on its own, so the climb through the tiers can be checked without playing
+     out a round of the pit for every question */
   window.pit.quiz = () => quiz;
+  window.pit.draw = who => drawQuestion(who);
+  window.pit.tally = () => tally;
 
   /* pin a round's shape, to try one kind or one size over and over */
   window.pit.force = f => { forced = f; };
