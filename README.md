@@ -27,14 +27,20 @@ pit there is no corner for it that leaves the pieces clear.
 card — or both, and they take it in turns. The two banks are pitched at the two
 people it was built for: Year 3 on one side and Year 5 on the other.
 
-Each bank climbs. It opens on the easiest tier — doubling, the two times table, ten
-more than — and a new tier comes into play every third right answer, up to four:
-three-quarters of a number and the eight times table at one end of the house, long
-multiplication, angles around a point and three-place decimals at the other. What
-unlocks a tier is answers got right rather than questions asked, so a child who is
+Each bank climbs, and says so. There are four levels, named: a bar across the top of
+the screen carries the level, whose it is, and how much of it is left — "Level 2 ·
+Bea", "4 more for Level 3" — and it fills as they get questions right. Finishing one
+fills the bar to the top, says "Level 3!" on the card, and throws some confetti
+before the pieces fall.
+
+Levels cost more as they go: three right answers for Level 2, four more for Level 3,
+five more for Level 4 — twelve in all, which is a sitting rather than five minutes.
+What counts is answers got right rather than questions asked, so a child who is
 struggling is not pushed up for it, and about a third of the questions come from the
-tier below, so the climb is felt rather than stepped off. It starts easy again each
-time the game is opened.
+level below, so the climb is felt rather than stepped off. Level 1 is doubling, the
+two times table and ten more than; Level 4 is three-quarters of a number and the
+eight times table in one house, long multiplication, angles around a point and three
+decimal places in the other. It starts at Level 1 again each time the game is opened.
 
 Every question is generated rather than drawn from a list, so the same one does not
 come round twice in an evening, and every answer is a number or one of a few buttons

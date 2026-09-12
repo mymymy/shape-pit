@@ -106,6 +106,18 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
 .best{margin:0 0 14px!important;font-size:12px;color:var(--dim)!important;
   font-variant-numeric:tabular-nums;min-height:1.2em}
 
+/* the level, and how far through it, across the top of everything */
+.ladder{display:flex;flex-direction:column;gap:5px;pointer-events:none}
+.rungs{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.rungs p{margin:0;text-shadow:0 1px 0 var(--ink),0 0 12px var(--ink)}
+.level{font-size:12px;letter-spacing:.13em;text-transform:uppercase;font-weight:500}
+.toNext{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+.track{height:7px;border-radius:4px;overflow:hidden;
+  background:color-mix(in srgb,var(--edge) 75%,transparent);box-shadow:0 1px 0 var(--ink)}
+.fill{height:100%;width:0;border-radius:4px;background:var(--hi);
+  transition:width .55s cubic-bezier(.2,.8,.2,1)}
+.ladder.up .level{color:var(--hi)}
+
 /* maths mode: a question before the pieces fall */
 .who{margin-top:18px;padding-top:16px;border-top:1px solid var(--edge)}
 .who h3{margin:0 0 6px;font-size:11px;letter-spacing:.13em;text-transform:uppercase;
@@ -137,6 +149,14 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
 <canvas id="pit"></canvas>
 
 <div class="hud">
+  <div class="ladder" id="ladder" hidden>
+    <div class="rungs">
+      <p class="level" id="levelNow">Level 1</p>
+      <p class="toNext" id="toNext"></p>
+    </div>
+    <div class="track"><div class="fill" id="fill"></div></div>
+  </div>
+
   <div class="bar">
     <header class="brand">
       <h1 class="serif">Shape Pit</h1>
@@ -1512,9 +1532,9 @@ function travelled(){
    in — and since the card is a layer above the canvas, every piece starts hidden
    behind it and appears at its edges */
 const bits = [];
-function shower(){
+function shower(from){
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const r = resultCard.getBoundingClientRect();
+  const r = (from || resultCard).getBoundingClientRect();
   const ox = r.width ? r.left : W*0.7, oy = r.height ? r.top : 20;
   const cw = r.width || 200, ch = r.height || 90;
   const s = Math.min(1.4, Math.min(W,H)/620), reach = Math.hypot(W,H);
@@ -1938,8 +1958,19 @@ asker.addEventListener('click', e => {
    the highest tier unlocked — mostly, with a third of them from the tier below, so
    the climb is felt rather than stepped off. What unlocks a tier is answers got
    right, not questions asked: a child who is struggling is not pushed up for it */
-const STEP_UP = 3;         /* right answers before the next tier comes into play */
-const EASE_OFF = 0.35;     /* how often it drops back a tier for one */
+/* Four levels, and they cost more as they go: three right answers to reach Level 2,
+   four more for Level 3, five more for Level 4. Twelve in all, which is a good
+   sitting rather than five minutes, and the later ones feel earned */
+const LEVEL_UP = [3, 4, 5];
+const EASE_OFF = 0.35;     /* how often a round drops back a level for one question */
+
+/* where a player stands: the level, how far into it, and how much of it there is */
+function standing(who){
+  const right = tally[who] ? tally[who].right : 0;
+  let lv = 0, base = 0;
+  while (lv < LEVEL_UP.length && right >= base + LEVEL_UP[lv]){ base += LEVEL_UP[lv]; lv++; }
+  return { lv, into: right - base, need: lv < LEVEL_UP.length ? LEVEL_UP[lv] : 0 };
+}
 
 const ri = (lo,hi) => lo + Math.floor(Math.random()*(hi-lo+1));
 const oneOf = a => a[Math.floor(Math.random()*a.length)];
@@ -2113,7 +2144,7 @@ const OLDER = [
 /* the question in front of this round, pitched by how many this player has had right */
 function drawQuestion(who){
   const bank = KIDS[who] >= 9 ? OLDER : YOUNGER;
-  const top = Math.min(bank.length - 1, Math.floor(tally[who].right / STEP_UP));
+  const top = Math.min(bank.length - 1, standing(who).lv);
   const tier = bank[top > 0 && Math.random() < EASE_OFF ? top - 1 : top];
   const out = tier[Math.floor(Math.random()*tier.length)]();
   out.tier = top;
@@ -2131,6 +2162,43 @@ const tally = {};
 const mathCard = el('mathCard'), askEl = el('ask'), turnEl = el('turn'), markEl = el('mark'),
       tallyEl = el('tally'), pickEl = el('pick'), entryEl = el('entry'),
       mathInput = el('mathInput'), mathGo = el('mathGo');
+const ladder = el('ladder'), levelNow = el('levelNow'), toNext = el('toNext'), fillEl = el('fill');
+
+/* the bar across the top belongs to whoever is up: the one answering, and then the
+   one whose round it is. It stays through the pit, so what they climbed is still
+   there to see while the pieces fall */
+let facing = null;
+function showLadder(who, lifted){
+  if (who) facing = who;
+  if (!players.length || !facing){ ladder.hidden = true; return; }
+  const st = standing(facing);
+  levelNow.textContent = `Level ${st.lv + 1}` + (players.length > 1 ? ` \u00b7 ${facing}` : '');
+  toNext.textContent = st.need ? `${st.need - st.into} more for Level ${st.lv + 2}` : 'Top level';
+  const pct = st.need ? st.into/st.need*100 : 100;
+  if (lifted){
+    /* fill to the top first, and only then start the next level from the left. Sliding
+       straight to the new figure animates the bar backwards, which is the opposite of
+       what just happened: they finished a level rather than losing any of one */
+    fillEl.style.width = '100%';
+    setTimeout(() => {
+      fillEl.style.transition = 'none';
+      fillEl.style.width = pct + '%';
+      void fillEl.offsetHeight;              /* land it before it can animate */
+      fillEl.style.transition = '';
+    }, 700);
+  } else {
+    fillEl.style.width = pct + '%';
+  }
+  ladder.classList.toggle('up', !!lifted);
+  ladder.hidden = false;
+}
+
+/* whose turn, and where they now stand */
+function sayTurn(who){
+  const st = standing(who);
+  turnEl.textContent = (players.length > 1 ? who + '\u2019s turn \u00b7 ' : who + ' \u00b7 ')
+                     + 'Level ' + (st.lv + 1);
+}
 
 function setPlayers(list){
   players = list.filter(n => KIDS[n]);
@@ -2138,6 +2206,8 @@ function setPlayers(list){
   for (const n of players) tally[n] = tally[n] || { right: 0, asked: 0 };
   try { localStorage.setItem(WHO_KEY, players.join('+')); } catch (e) {}
   for (const b of el('whoPick').children) b.classList.toggle('on', b.dataset.who === players.join('+'));
+  facing = players.length ? players[turnAt % players.length] : null;
+  showLadder(facing, false);
 }
 
 function showTally(){
@@ -2159,7 +2229,8 @@ function poseQuestion(){
   quiz = drawQuestion(who);
   quiz.who = who;
   tries = 0;
-  turnEl.textContent = players.length > 1 ? who + '\u2019s turn' : who;
+  sayTurn(who);
+  showLadder(who, false);
   askEl.textContent = quiz.q;
   askEl.classList.toggle('wordy', quiz.q.length > 26);
   markEl.textContent = ''; markEl.className = 'mark';
@@ -2194,13 +2265,20 @@ function answer(given, btn){
     : String(given).trim() === String(want);
 
   if (right){
+    const was = standing(quiz.who).lv;
     tally[quiz.who].asked++; tally[quiz.who].right++;
-    markEl.textContent = tries ? 'That\u2019s it.' : oneOf(['Yes.', 'That\u2019s it.', 'Spot on.', 'Correct.']);
+    const up = standing(quiz.who).lv > was;
+    markEl.textContent = up ? `Level ${standing(quiz.who).lv + 1}!`
+                        : tries ? 'That\u2019s it.'
+                        : oneOf(['Yes.', 'That\u2019s it.', 'Spot on.', 'Correct.']);
     markEl.className = 'mark yes';
     entryEl.hidden = true; pickEl.hidden = true;
     showTally();
+    showLadder(quiz.who, up);
+    if (up){ sayTurn(quiz.who); shower(mathCard); }   /* moving up is worth confetti,
+                                        and the card should say where they now are */
     quiz = null;
-    setTimeout(fallIn, 850);                   /* a beat to see it, then the pieces */
+    setTimeout(fallIn, up ? 1900 : 850);       /* a beat to see it, then the pieces */
     return;
   }
 
@@ -2215,6 +2293,7 @@ function answer(given, btn){
   entryEl.hidden = true; pickEl.hidden = true;
   tally[quiz.who].asked++;
   showTally();
+  showLadder(quiz.who, false);
   quiz = null;
   mathGo.hidden = false;
   mathGo.focus();
