@@ -24,7 +24,9 @@ The box that asks the question can be dragged aside by its grip, since on a full
 pit there is no corner for it that leaves the pieces clear.
 
 **Maths mode** puts a question in front of each round. Pick a player on the start
-card — or both, and they take it in turns. The two banks are pitched at the two
+card — or both, and they take it in turns. The only way out of it is the start card,
+which a reload brings back: there is nothing on the question card offering a child a
+way past the question. The two banks are pitched at the two
 people it was built for: Year 3 on one side and Year 5 on the other.
 
 Each bank climbs, and says so. There are four levels, named: a bar across the top of
