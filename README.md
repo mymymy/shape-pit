@@ -23,6 +23,18 @@ it cannot be counted.
 The box that asks the question can be dragged aside by its grip, since on a full
 pit there is no corner for it that leaves the pieces clear.
 
+Guess the count exactly and the pit itself celebrates: a bar of light runs up it from
+the floor and off the top, every piece taking the colour as the bar reaches it and
+letting it go behind. It is a better reward than paper thrown at a card, because it is
+made of the thing you have just counted. The colour is the player's level where maths
+mode is on and the house accent where it is not — either way something the round's own
+palette did not choose — and it is lifted towards the light so it reads as lit rather
+than merely repainted. The blend is cut once into a ramp of nine colour tables rather
+than worked out per piece per frame: with two thousand pieces on screen, mixing and
+formatting a colour string sixty times a second for each of them is most of a frame
+spent on arithmetic, and a band quantised to eight steps is one nobody can tell from a
+smooth one.
+
 **Maths mode** puts a question in front of each round. Pick a player on the start
 card — or both, and they take it in turns. The only way out of it is the start card,
 which a reload brings back: there is nothing on the question card offering a child a
