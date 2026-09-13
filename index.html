@@ -620,7 +620,7 @@ function inks(colours){
     rims.push(css(r));
     flats.push(css(c));
   }
-  wave = null;                               /* a palette change outlives no wave */
+  cheer = null;                              /* no celebration outlives its palette */
 }
 
 /* Sheets of speckle laid over the picture rather than a pattern carried by every
@@ -1628,72 +1628,141 @@ function flutter(dt){
   }
 }
 
-/* ---------------------------------------------------------- the victory wave */
+/* ---------------------------------------------------------- the celebration */
 /* A round guessed exactly deserves better than a handful of confetti thrown at the
-   card: the pieces themselves light up instead, a band of colour running up the pit
-   from the floor and off the top, so what you see is the heap you have just counted
-   counting itself back at you.
+   card: the pieces themselves light up instead, so what you see is the heap you have
+   just counted celebrating with you.
+
+   There are three ways of doing it and no way to tell from the code which is best,
+   so all three are here and ?cheer puts a row of buttons next to the answer that
+   plays each of them on the same pit. Comparing two celebrations from memory, a
+   round apart, is not comparing them at all.
+
+     wave     a bar of colour running up the pit from the floor and off the top
+     scatter  one colour arriving piece by piece in no order, holding, draining away
+     riot     the same, but every piece takes one of the six level colours at random
 
    The blend is cut once into a ramp of colour tables rather than worked out per
    piece per frame. With two thousand pieces on screen, mixing and formatting a
    colour string sixty times a second for each of them is most of a frame spent on
-   arithmetic, and a band quantised to eight steps is a band nobody can tell from a
-   smooth one. */
-const WAVE_MS = 1200;                        /* floor to ceiling, the whole sweep */
-const WAVE_STEPS = 8;                        /* how finely the blend is cut */
-const WAVE_DEEP = 0.9;                       /* how far a lit piece goes over */
-let wave = null, waveFlat = null, waveRim = null;
+   arithmetic, and eight steps is a blend nobody can tell from a smooth one. */
+const CHEERS = ['wave', 'scatter', 'riot'];
+const CHEER_MS = { wave: 1000, scatter: 1500, riot: 1600 };
+const CHEER_STEPS = 8;                       /* how finely the blend is cut */
+const CHEER_FILL = 0.52;                     /* of scatter and riot, the share spent
+                                                filling before it all drains away */
+let cheer = null, cheerFlat = null, cheerRim = null, cheerAt = null, cheerHue = null;
+let cheerStyle = 'wave';
 
-function startWave(){
-  if (!bx || !live) return;
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;   /* as the confetti did not, either */
-  /* the level's colour where there is a level, and the house accent where there
-     is not: either way something the round's own palette did not choose */
-  const style = getComputedStyle(document.body);
+/* what a celebration is made of: the player's level colour where there is one and
+   the house accent where there is not — either way something the round's own palette
+   did not choose — or, for a riot, the whole ladder of level colours at once */
+function cheerTints(style){
+  const style_ = getComputedStyle(document.body);
+  const get = n => style_.getPropertyValue(n).trim();
+  if (style === 'riot'){
+    const all = [];
+    for (let i=1;i<=6;i++){ const c = get(`--lv${i}`); if (c) all.push(hex(c)); }
+    if (all.length) return all;
+  }
   const lv = facing && players.length ? standing(facing).lv + 1 : 0;
-  const tint = hex((lv ? style.getPropertyValue(`--lv${lv}`).trim() : '')
-                   || style.getPropertyValue('--hi').trim() || '#9A6B1F');
-  /* lifted towards the light, so what crosses the pit reads as lit rather than
-     merely repainted, with the rim left dark enough to keep the pieces apart */
-  const litTint = blend(tint, [255,255,255], .22);
-  const rimTint = blend(tint, [0,0,0], .30);
-
-  waveFlat = []; waveRim = [];
-  for (let s=0; s<=WAVE_STEPS; s++){
-    const k = s/WAVE_STEPS*WAVE_DEEP;
-    waveFlat.push(rawFlat.map(c => mix(c, litTint, k)));
-    waveRim.push(rawRim.map(c => mix(c, rimTint, k)));
-  }
-
-  /* how far up the pit the band has to travel, measured off the pieces rather than
-     the window: a shallow round should not spend the first half of its celebration
-     sweeping empty air */
-  let top = Infinity, bot = -Infinity;
-  for (let i=0;i<live;i++){
-    if (by[i] + bound[i] < 0) continue;
-    if (by[i] < top) top = by[i];
-    if (by[i] > bot) bot = by[i];
-  }
-  if (!isFinite(top)) return;
-  /* the band's bright middle runs from just under the lowest piece to just over the
-     highest, so the whole sweep is spent on the pit and none of it on empty air */
-  const band = Math.max(SIZE*5, (bot-top)*0.26 + SIZE*2);
-  wave = { at: performance.now(), band, from: bot, to: top - band, front: bot };
+  return [hex((lv ? get(`--lv${lv}`) : '') || get('--hi') || '#9A6B1F')];
 }
 
-/* where the band has got to, and whether there is still a wave at all */
-function rollWave(now){
-  if (!wave) return false;
-  const t = (now - wave.at)/WAVE_MS;
-  if (t >= 1){ wave = null; needsDraw = true; return false; }
-  const e = t*t*(3 - 2*t);                   /* a swell rather than a lift and a stop */
-  wave.front = wave.from + (wave.to - wave.from)*e;
+function startCheer(style){
+  if (!bx || !live) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;   /* as the confetti did not, either */
+  style = style || cheerStyle;
+  const tints = cheerTints(style);
+
+  /* lifted towards the light, so what crosses the pit reads as lit rather than
+     merely repainted, with the rim left dark enough to keep the pieces apart */
+  cheerFlat = []; cheerRim = [];
+  for (const tint of tints){
+    const lit = blend(tint, [255,255,255], .22), rim = blend(tint, [0,0,0], .30);
+    const flats_ = [], rims_ = [];
+    for (let s=0; s<=CHEER_STEPS; s++){
+      const k = s/CHEER_STEPS;
+      flats_.push(rawFlat.map(c => mix(c, lit, k)));
+      rims_.push(rawRim.map(c => mix(c, rim, k)));
+    }
+    cheerFlat.push(flats_); cheerRim.push(rims_);
+  }
+
+  if (!cheerAt || cheerAt.length < live){
+    cheerAt = new Float32Array(live); cheerHue = new Uint8Array(live);
+  }
+  for (let i=0;i<live;i++){
+    cheerAt[i] = Math.random()*CHEER_FILL;
+    cheerHue[i] = tints.length > 1 ? (Math.random()*tints.length)|0 : 0;
+  }
+
+  cheer = { style, at: performance.now(), ms: CHEER_MS[style] || 1200, out: 1 };
+
+  if (style === 'wave'){
+    /* how far up the pit the bar has to travel, measured off the pieces rather than
+       the window: a shallow round should not spend half its celebration sweeping
+       empty air. Its bright middle runs from just under the lowest piece to just
+       over the highest */
+    let top = Infinity, bot = -Infinity;
+    for (let i=0;i<live;i++){
+      if (by[i] + bound[i] < 0) continue;
+      if (by[i] < top) top = by[i];
+      if (by[i] > bot) bot = by[i];
+    }
+    if (!isFinite(top)){ cheer = null; return; }
+    cheer.band = Math.max(SIZE*5, (bot-top)*0.26 + SIZE*2);
+    cheer.from = bot; cheer.to = top - cheer.band; cheer.front = bot;
+  }
+}
+
+/* how far along it is, and whether there is a celebration left at all */
+function rollCheer(now){
+  if (!cheer) return false;
+  const t = (now - cheer.at)/cheer.ms;
+  if (t >= 1){ cheer = null; needsDraw = true; return false; }
+  cheer.t = t;
+  if (cheer.band){
+    const e = t*t*(3 - 2*t);                 /* a swell rather than a lift and a stop */
+    cheer.front = cheer.from + (cheer.to - cheer.from)*e;
+  } else {
+    /* it fills piece by piece and then the whole pit drains together, which is what
+       makes it a celebration rather than a twinkle: there is a moment where all of
+       it is lit at once */
+    cheer.out = clamp((1 - t)/(1 - CHEER_FILL - 0.26), 0, 1);
+  }
   return true;
+}
+
+/* ?cheer=<name> plays that one; ?cheer on its own puts the row of them next to the
+   answer so they can be tried one after another on the same pit */
+const CHEER_ASK = new URLSearchParams(location.search).get('cheer');
+if (CHEERS.includes(CHEER_ASK)) cheerStyle = CHEER_ASK;
+let cheerBar = null;
+
+function showCheerBar(){
+  if (CHEER_ASK === null) return;
+  if (!cheerBar){
+    cheerBar = document.createElement('div');
+    cheerBar.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:9;display:flex;'
+      + 'gap:6px;padding:6px;border-radius:10px;background:color-mix(in srgb,var(--panel) 88%,transparent);'
+      + 'border:1px solid var(--edge);font:12px/1 ui-sans-serif,system-ui,sans-serif';
+    for (const name of CHEERS){
+      const b = document.createElement('button');
+      b.textContent = name;
+      b.style.cssText = 'padding:5px 9px;border-radius:7px;border:1px solid var(--edge);'
+        + 'background:transparent;color:var(--text);cursor:pointer';
+      b.onclick = () => { cheerStyle = name; startCheer(name); };
+      cheerBar.append(b);
+    }
+    document.body.append(cheerBar);
+  }
+  cheerBar.hidden = false;
 }
 
 /* -------------------------------------------------------------- drawing */
 /* one piece, at the place the frame has worked out for it */
-function lay(g, i, moat, x, y, a, lit){
+function lay(g, i, moat, x, y, a, lit, hue){
   const t = TPL[tpl[i]];
   g.save();
   g.translate(x, y);
@@ -1704,9 +1773,9 @@ function lay(g, i, moat, x, y, a, lit){
   g.strokeStyle = ground[clamp((by[i]/H*11)|0, 0, 11)];
   g.stroke(t.path);
   g.lineWidth = lineW;
-  g.fillStyle = lit ? waveFlat[lit][col[i]] : flats[col[i]];
+  g.fillStyle = lit ? cheerFlat[hue][lit][col[i]] : flats[col[i]];
   g.fill(t.path);
-  g.strokeStyle = lit ? waveRim[lit][col[i]] : rims[col[i]];
+  g.strokeStyle = lit ? cheerRim[hue][lit][col[i]] : rims[col[i]];
   g.stroke(t.path);
   g.restore();
 }
@@ -1736,18 +1805,22 @@ function draw(){
       if (dx*dx + dy*dy < near2){ x = ox[i] + dx*alpha; y = oy[i] + dy*alpha; }
       if (da > -1 && da < 1) a = oa[i] + da*alpha;
     }
-    /* a bar of light with soft edges rather than a gradient to a point: the middle
-       two fifths are full, and it falls away over the rest. Quantised, as the
-       tables are */
+    /* how lit this piece is, quantised as the tables are: a bar with a flat middle
+       and soft edges where one is sweeping past, otherwise the piece's own moment
+       to come on against the drain that takes the whole pit back */
     let lit = 0;
-    if (wave){
-      const u = (y - wave.front)/wave.band;
-      if (u > 0 && u < 1){
-        const v = u < 0.3 ? u/0.3 : u > 0.7 ? (1-u)/0.3 : 1;
-        lit = Math.round(v*WAVE_STEPS);
+    if (cheer){
+      let v = 0;
+      if (cheer.band){
+        const u = (y - cheer.front)/cheer.band;
+        if (u > 0 && u < 1) v = u < 0.2 ? u/0.2 : u > 0.8 ? (1-u)/0.2 : 1;
+      } else {
+        v = Math.min((cheer.t - cheerAt[i])*9, cheer.out);
+        if (v < 0) v = 0; else if (v > 1) v = 1;
       }
+      lit = Math.round(v*CHEER_STEPS);
     }
-    lay(ctx, i, moat, x, y, a, lit);
+    lay(ctx, i, moat, x, y, a, lit, lit ? cheerHue[i] : 0);
   }
   speckle(grainTop);                         /* and a breath of it over the pieces */
   for (const b of bits){
@@ -1891,8 +1964,8 @@ function frame(now){
   const dt = Math.min(0.1, last ? (now-last)/1000 : 1/60);
   last = now;
   const moving = phase === 'dropping' || phase === 'settling';
-  const waving = rollWave(now);
-  if (!moving && !bits.length && !needsDraw && !reveal && !waving) return;
+  const cheering = rollCheer(now);
+  if (!moving && !bits.length && !needsDraw && !reveal && !cheering) return;
   needsDraw = false;
   alpha = 1;                                 /* nothing to draw between, unless the
                                                 stepping below says otherwise */
@@ -2015,7 +2088,8 @@ function judge(guess){
     : `Best so far: ${pretty(was.pct)}, out of ${was.n}.`;
   best.hidden = !best.textContent;           /* no empty line holding the card open */
   settleAsker();                              /* once it is the size it is going to be, */
-  if (err === 0) startWave();                /* the pit lights itself, floor to ceiling */
+  if (err === 0) startCheer();               /* the pit lights itself */
+  showCheerBar();                            /* ?cheer only: the row to try them with */
   el('againBtn').focus();
 }
 
@@ -2842,7 +2916,10 @@ if (new URLSearchParams(location.search).has('debug')){
   window.pit.rebuildChips = () => buildChips();   /* fresh draws of the templates */
   window.pit.reveal = () => reveal && reveal.kind;
   window.pit.debut = k => { if (k !== undefined) debut = k; return debut; };
-  window.pit.wave = () => wave && { front: wave.front, band: wave.band, from: wave.from, to: wave.to };
+  window.pit.cheer = (name) => { if (name) startCheer(name);
+    return cheer && { style: cheer.style, t: cheer.t, tints: cheerFlat.length,
+                      front: cheer.front, band: cheer.band,
+                      from: cheer.from, to: cheer.to }; };
   window.pit.repaint = () => { needsDraw = true; };  /* to time a plain redraw */
 
   /* pin a round's shape, to try one kind or one size over and over */
