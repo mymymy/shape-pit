@@ -33,6 +33,12 @@ change is made at the bottom of the dip, where the piece is at nothing, so no co
 ever seen jumping to another. Pressing on to the next round is what ends it, and it
 lets go over a breath rather than snapping off.
 
+Because it has no length, the pit is redrawn every frame for as long as it is up. A tab
+put in the background costs nothing — the frame loop is driven by `requestAnimationFrame`,
+which browsers pause — but a device left open on this screen will keep drawing, and on
+the heaviest rounds that is a 33ms frame. It is deliberate: the alternative is a
+celebration that stops while a child is still looking at it.
+
 The colours are the level colours because the players already know them by sight and
 they were picked to work in either theme. Each is lifted towards the light so a lit
 piece reads as lit rather than repainted, with the rim left dark enough to keep the
