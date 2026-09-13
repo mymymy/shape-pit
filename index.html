@@ -1734,30 +1734,35 @@ function rollCheer(now){
   return true;
 }
 
-/* ?cheer=<name> plays that one; ?cheer on its own puts the row of them next to the
-   answer so they can be tried one after another on the same pit */
+/* ?cheer=<name> plays that one all session; ?cheer on its own puts the row of them
+   in the corner from the moment the page opens, so they can be tried one after
+   another on the same pit. One press is the whole of it: where there is a settled
+   pit the celebration runs on it at once, and where there is not — the start card,
+   a round still falling — the press fills a pit and lights it the moment it lands.
+   Having to guess a count correctly first is not a way to compare three of them. */
 const CHEER_ASK = new URLSearchParams(location.search).get('cheer');
 if (CHEERS.includes(CHEER_ASK)) cheerStyle = CHEER_ASK;
-let cheerBar = null;
+let cheerBar = null, cheerNext = null;
 
 function showCheerBar(){
-  if (CHEER_ASK === null) return;
-  if (!cheerBar){
-    cheerBar = document.createElement('div');
-    cheerBar.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:9;display:flex;'
-      + 'gap:6px;padding:6px;border-radius:10px;background:color-mix(in srgb,var(--panel) 88%,transparent);'
-      + 'border:1px solid var(--edge);font:12px/1 ui-sans-serif,system-ui,sans-serif';
-    for (const name of CHEERS){
-      const b = document.createElement('button');
-      b.textContent = name;
-      b.style.cssText = 'padding:5px 9px;border-radius:7px;border:1px solid var(--edge);'
-        + 'background:transparent;color:var(--text);cursor:pointer';
-      b.onclick = () => { cheerStyle = name; startCheer(name); };
-      cheerBar.append(b);
-    }
-    document.body.append(cheerBar);
+  if (CHEER_ASK === null || cheerBar) return;
+  cheerBar = document.createElement('div');
+  cheerBar.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:9;display:flex;'
+    + 'gap:6px;padding:6px;border-radius:10px;background:color-mix(in srgb,var(--panel) 88%,transparent);'
+    + 'border:1px solid var(--edge);font:12px/1 ui-sans-serif,system-ui,sans-serif';
+  for (const name of CHEERS){
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.style.cssText = 'padding:5px 9px;border-radius:7px;border:1px solid var(--edge);'
+      + 'background:transparent;color:var(--text);cursor:pointer';
+    b.onclick = () => {
+      cheerStyle = name;
+      if (live && (phase === 'guess' || phase === 'result')) startCheer(name);
+      else { cheerNext = name; if (phase !== 'dropping' && phase !== 'settling') start(); }
+    };
+    cheerBar.append(b);
   }
-  cheerBar.hidden = false;
+  document.body.append(cheerBar);
 }
 
 /* -------------------------------------------------------------- drawing */
@@ -1953,6 +1958,7 @@ function rest(){
     return;
   }
   phase = judged ? 'result' : 'guess';
+  if (cheerNext){ const c = cheerNext; cheerNext = null; startCheer(c); }
   needsDraw = true;
 }
 
@@ -2089,7 +2095,6 @@ function judge(guess){
   best.hidden = !best.textContent;           /* no empty line holding the card open */
   settleAsker();                              /* once it is the size it is going to be, */
   if (err === 0) startCheer();               /* the pit lights itself */
-  showCheerBar();                            /* ?cheer only: the row to try them with */
   el('againBtn').focus();
 }
 
@@ -2777,6 +2782,8 @@ for (const b of el('whoPick').children)
 
 buildChips();
 try { setPlayers((localStorage.getItem(WHO_KEY) || '').split('+')); } catch (e) { setPlayers([]); }
+
+showCheerBar();                              /* ?cheer only, and from the start */
 
 el('dropBtn').addEventListener('click', begin);
 el('againBtn').addEventListener('click', begin);

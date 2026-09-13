@@ -26,9 +26,11 @@ pit there is no corner for it that leaves the pieces clear.
 Guess the count exactly and the pit itself celebrates: the pieces light up, which is a
 better reward than paper thrown at a card because it is made of the thing you have just
 counted. There are three of them and no way to tell from the code which is best, so all
-three are there and `?cheer` puts a row of buttons next to the answer that plays each
-one on the same pit — comparing two celebrations from memory, a round apart, is not
-comparing them at all. **wave** runs a bar of colour up the pit from the floor and off
+three are there and `?cheer` puts a row of buttons in the corner that plays each one
+on demand — comparing two celebrations from memory, a round apart, is not comparing
+them at all. One press is the whole of it: on a settled pit it runs at once, and from
+the start card it fills a pit and lights it the moment it lands. No guessing a count
+correctly first. **wave** runs a bar of colour up the pit from the floor and off
 the top. **scatter** brings one colour on piece by piece in no order, holds the whole
 pit lit, then drains it. **riot** does the same but gives every piece one of the six
 level colours at random, so the heap turns to confetti where it lies. `?cheer=riot`
