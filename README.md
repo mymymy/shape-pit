@@ -23,26 +23,26 @@ it cannot be counted.
 The box that asks the question can be dragged aside by its grip, since on a full
 pit there is no corner for it that leaves the pieces clear.
 
-Guess the count exactly and the pit itself celebrates: the pieces light up, which is a
-better reward than paper thrown at a card because it is made of the thing you have just
-counted. There are three of them and no way to tell from the code which is best, so all
-three are there and `?cheer` puts a row of buttons in the corner that plays each one
-on demand — comparing two celebrations from memory, a round apart, is not comparing
-them at all. One press is the whole of it: on a settled pit it runs at once, and from
-the start card it fills a pit and lights it the moment it lands. No guessing a count
-correctly first. **wave** runs a bar of colour up the pit from the floor and off
-the top. **scatter** brings one colour on piece by piece in no order, holds the whole
-pit lit, then drains it. **riot** does the same but gives every piece one of the six
-level colours at random, so the heap turns to confetti where it lies. `?cheer=riot`
-plays a whole session in one of them.
+Guess the count exactly and the pit itself celebrates: every piece takes one of the six
+level colours at random and the heap turns to confetti where it lies, which is a better
+reward than paper thrown at a card because what is celebrating is the thing you have
+just counted. It arrives piece by piece in no order, and then it does not stop — each
+piece keeps its colour a second or two, dips back through its own, and comes up in a
+different one, so the pit goes on changing for as long as anyone cares to watch it. The
+change is made at the bottom of the dip, where the piece is at nothing, so no colour is
+ever seen jumping to another. Pressing on to the next round is what ends it, and it
+lets go over a breath rather than snapping off.
 
-The colour is the player's level where maths mode is on and the house accent where it
-is not — either way something the round's own palette did not choose — lifted towards
-the light so it reads as lit rather than repainted. The blend is cut once into a ramp
-of colour tables rather than worked out per piece per frame: with two thousand pieces
-on screen, mixing and formatting a colour string sixty times a second for each of them
-is most of a frame spent on arithmetic, and eight steps is a blend nobody can tell from
-a smooth one.
+The colours are the level colours because the players already know them by sight and
+they were picked to work in either theme. Each is lifted towards the light so a lit
+piece reads as lit rather than repainted, with the rim left dark enough to keep the
+pieces apart. The blend is cut once into a ramp of colour tables rather than worked out
+per piece per frame: with two thousand pieces on screen, mixing and formatting a colour
+string sixty times a second for each of them is most of a frame spent on arithmetic,
+and eight steps is a blend nobody can tell from a smooth one. `?cheer` puts a button in
+the corner that plays it on demand, from the moment the page opens — on a settled pit
+it runs at once, and from the start card it fills a pit and lights it the moment it
+lands, with no guessing a count correctly first.
 
 **Maths mode** puts a question in front of each round. Pick a player on the start
 card — or both, and they take it in turns. The only way out of it is the start card,
