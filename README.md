@@ -92,19 +92,22 @@ The circle and the petal are not given a side count anywhere, only a place in th
 order. Whether a circle has one side or none is a thing some teachers say and others
 mark wrong, and this is not the game to settle it in. Three onwards is not in doubt.
 
-One a level means a ladder collects as many shapes as it has rungs, so Bea's six
-reach all six and Venus's four reach the first four: circles, triangles, rectangles
-and pebbles, which are the ones she is being taught to name anyway. Her row on the
-card is four long rather than six, since a locked shape nobody can reach is not
-something to look at all evening. With no maths on, the pit has all six from the
-start, as it always did.
+One a level means a ladder collects as many shapes as it has rungs, and both ladders
+are six long, so both of them reach all six. With no maths on, the pit has all six
+from the start, as it always did.
 
-Venus climbs her own four tiers, three right answers for Level 2 and then four and
-five. Bea's ladder has six rungs and opens on two levels of Venus's bank — the same
-sums her sister is doing, which she can do standing on her head — before starting on
-her own year at Level 3. Beginning a ten-year-old on a seven-year-old's first tier
-would be insulting rather than encouraging, so the warm-up starts a couple of tiers
-in and costs two right answers a rung rather than three.
+Venus climbs six tiers of her own bank: four of Year 3, and then two that stretch into
+Year 4 — the sixes, sevens, nines and twelves, three-digit sums, area and perimeter,
+remainders, and which of two unit fractions is the bigger. The top of a ladder ought to
+be a stretch, and hers is one she will have climbed over many sittings to get to. Three
+right answers for Level 2, then four, four, four and five: twenty in all, against Bea's
+sixteen, which is close enough that neither of them is watching the other pull ahead.
+
+Bea's six rungs open on two levels of Venus's bank — the same sums her sister is doing,
+which she can do standing on her head — before starting on her own year at Level 3.
+Beginning a ten-year-old on a seven-year-old's first tier would be insulting rather than
+encouraging, so the warm-up starts a couple of tiers in and costs two right answers a
+rung rather than three.
 
 What counts is answers got right rather than questions asked, so a child who is
 struggling is not pushed up for it, and about a third of the questions come from the

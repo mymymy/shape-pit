@@ -229,7 +229,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
       <h2 class="serif ask" id="ask"></h2>
       <div class="choices" id="pick" hidden></div>
       <div class="entry" id="entry">
-        <input id="mathInput" type="number" step="any" inputmode="numeric"
+        <!-- decimal rather than numeric: Bea's bank asks things like 0.717 + 0.4, and
+             an iPhone's "numeric" keypad has no decimal point on it to answer with -->
+        <input id="mathInput" type="number" step="any" inputmode="decimal"
                aria-label="Your answer" placeholder="?">
         <button class="primary" type="submit">Answer</button>
       </div>
@@ -2226,6 +2228,43 @@ const YOUNGER = [
             return { q: `${st+4*s}, ${st+3*s}, ${st+2*s}, ${st+s}, ?`, a: st }; },
     () => { const p = ri(3,6), c = ri(2,4), e = ri(2,6);
             return { q: `${p} bags hold ${c} apples each. ${e} apples are eaten. How many are left?`, a: p*c-e }; }
+  ],
+  [ /* stretching */
+    () => { const a = ri(120,480), b = ri(11,59); return { q: `${a} + ${b}`, a: a+b }; },
+    () => { const n = ri(2,12); return { q: `${n} × 6`, a: n*6 }; },
+    () => { const n = ri(2,12); return { q: `${n} × 7`, a: n*7 }; },
+    () => { const t = oneOf([6,8]), n = ri(2,12); return { q: `${n*t} ÷ ${t}`, a: n }; },
+    () => { const n = ri(3,48); return { q: `${n} × 100`, a: n*100 }; },
+    () => { const n = ri(240,980); return { q: `Round ${n} to the nearest 100`, a: Math.round(n/100)*100 }; },
+    () => { const n = ri(2,9)*3; return { q: `Two thirds of ${n}`, a: n/3*2 }; },
+    () => { const p = ri(12,88); return { q: `A ruler costs ${p}p. What is the change from £1, in pence?`, a: 100-p }; },
+    () => { const w = ri(3,12), h = ri(2,9);
+            return { q: `A rectangle is ${w}cm by ${h}cm. What is its perimeter, in cm?`, a: 2*(w+h) }; },
+    () => { const h = ri(1,11), m = oneOf([10,20,25,35,40,50]);
+            return { q: `It is ${h}:${pad2(m)}. How many minutes until ${h+1} o’clock?`, a: 60-m }; },
+    () => { const n = ri(2,9); return { q: `${n*2}/${n*4} is the same as which fraction?`,
+                                        a: '1/2', pick: shuffle(['1/2','1/3','1/4']) }; },
+    () => { const k = ri(3,7), n = ri(3,9);
+            return { q: `${k} shelves hold ${n} books each. How many books altogether?`, a: k*n }; }
+  ],
+  [ /* the top */
+    () => { const n = ri(2,12); return { q: `${n} × 9`, a: n*9 }; },
+    () => { const t = oneOf([11,12]), n = ri(2,12); return { q: `${n} × ${t}`, a: n*t }; },
+    () => { const a = ri(320,940), b = ri(110,290); return { q: `${a} − ${b}`, a: a-b }; },
+    () => { const n = ri(120,480); return { q: `Double ${n}`, a: n*2 }; },
+    () => { const t = oneOf([3,4,5]), n = ri(3,9), r = ri(1,t-1);
+            return { q: `What is the remainder when ${n*t+r} is divided by ${t}?`, a: r }; },
+    () => { const f = oneOf([[2,5],[3,5],[3,4],[5,6]]), n = ri(2,6)*f[1];
+            return { q: `${f[0]}/${f[1]} of ${n}`, a: n/f[1]*f[0] }; },
+    () => { const w = ri(3,12), h = ri(2,9);
+            return { q: `A rectangle is ${w}cm by ${h}cm. What is its area, in cm²?`, a: w*h }; },
+    () => { const d = someOf([2,3,4,5,6,8], 2).sort((x,y) => x-y);   /* the smaller bottom wins */
+            return { q: `Which fraction is bigger?`, a: `1/${d[0]}`,
+                     pick: shuffle([`1/${d[0]}`, `1/${d[1]}`]) }; },
+    () => { const s = ri(4,9), st = ri(2,9)*s;
+            return { q: `${st}, ${st+s}, ${st+2*s}, ?, ${st+4*s}`, a: st+3*s }; },
+    () => { const k = ri(3,6), n = ri(4,9), e = ri(2,8);
+            return { q: `${k} boxes hold ${n} pencils each. ${e} are lost. How many are left?`, a: k*n-e }; }
   ]
 ];
 
@@ -2338,10 +2377,9 @@ const LADDER = {
   Bea:   [YOUNGER[1], YOUNGER[3], OLDER[0], OLDER[1], OLDER[2], OLDER[3]]
 };
 /* What the maths is actually for, as far as anyone playing is concerned: the pit
-   starts with three shapes in it and the rest are earned a level at a time. The
-   order runs from the rounded and well-behaved to the long and dramatic, so the
-   heap visibly gets more interesting as they climb rather than merely different.
-   Both ladders end with all eight, whichever length they are */
+   starts with circles alone and the rest are earned a level at a time, in the order
+   of how many sides they have, so a level's reward says something true about the
+   level. Both ladders are six long, so both end with all six */
 const UNLOCK = ['circle','petal','triangle','rectangle','pentagon','hexagon'];
 const FREE_KINDS = 1;      /* circles, and nothing else, until a level is won */
 const PLURAL = k => k + 's';
@@ -2373,7 +2411,7 @@ function reach(who){
 /* what each rung costs in right answers. They cost more as they go, so the warm-up
    is a warm-up and the top of the ladder is worth getting to */
 const COST = {
-  Venus: [3, 4, 5],
+  Venus: [3, 4, 4, 4, 5],
   Bea:   [2, 2, 3, 4, 5]
 };
 
