@@ -2167,6 +2167,26 @@ const pad2 = n => String(n).padStart(2,'0');
 const neg = n => (n < 0 ? '−' : '') + Math.abs(n);
 const frac = [[1,2],[1,3],[2,3],[1,4],[3,4],[1,5],[2,5],[3,5],[4,5],[1,6],[5,6],[3,8],[5,8],[3,10],[7,10]];
 
+/* Sums built to be done in the head. A child — or an adult — can hold one carry or
+   one borrow and no more; two is the point at which everyone reaches for a pen, and
+   a question that wants a pen is a question that loses the room.
+
+   So the columns are chosen rather than the numbers: the lower column is made never
+   to cross, and the upper one made always to. That puts the whole difficulty in one
+   place, which is the place worth practising — 910 + 240 rather than 917 + 246. The
+   unit is the size of the lowest column that matters, so the same two build tens,
+   hundreds or thousands. */
+function mentalSum(unit, loTop, hiFrom, hiTo){
+  const lo = ri(0, loTop), lo2 = ri(0, loTop - lo);      /* the low column never carries */
+  const hi = ri(hiFrom, hiTo), hi2 = ri(10 - hi, 9);     /* the high column always does */
+  return [hi*unit*10 + lo*unit, hi2*unit*10 + lo2*unit];
+}
+function mentalGap(unit, hiFrom, hiTo){
+  const lo2 = ri(1, 9), lo = ri(0, lo2 - 1);             /* the low column must borrow */
+  const hi2 = ri(1, hiFrom), hi = ri(hi2 + 1, hiTo);     /* and the high one has room for it */
+  return [hi*unit*10 + lo*unit, hi2*unit*10 + lo2*unit];
+}
+
 /* Venus, seven: Year 3 */
 const YOUNGER = [
   [ /* first steps */
@@ -2217,7 +2237,7 @@ const YOUNGER = [
                      a: m===30?30:m===15?15:45 }; }
   ],
   [ /* the hard end */
-    () => { const a = ri(45,89), b = ri(45,89); return { q: `${a} + ${b}`, a: a+b }; },
+    () => { const [a,b] = mentalSum(1, 9, 4, 8); return { q: `${a} + ${b}`, a: a+b }; },
     () => { const a = ri(60,98), b = ri(22,55); return { q: `${a} − ${b}`, a: a-b }; },
     () => { const n = ri(2,12); return { q: `${n} × 8`, a: n*8 }; },
     () => { const t = oneOf([3,4]), n = ri(2,12); return { q: `${n*t} ÷ ${t}`, a: n }; },
@@ -2230,7 +2250,7 @@ const YOUNGER = [
             return { q: `${p} bags hold ${c} apples each. ${e} apples are eaten. How many are left?`, a: p*c-e }; }
   ],
   [ /* stretching */
-    () => { const a = ri(120,480), b = ri(11,59); return { q: `${a} + ${b}`, a: a+b }; },
+    () => { const [a,b] = mentalSum(10, 9, 4, 9); return { q: `${a} + ${b}`, a: a+b }; },
     () => { const n = ri(2,12); return { q: `${n} × 6`, a: n*6 }; },
     () => { const n = ri(2,12); return { q: `${n} × 7`, a: n*7 }; },
     () => { const t = oneOf([6,8]), n = ri(2,12); return { q: `${n*t} ÷ ${t}`, a: n }; },
@@ -2250,8 +2270,8 @@ const YOUNGER = [
   [ /* the top */
     () => { const n = ri(2,12); return { q: `${n} × 9`, a: n*9 }; },
     () => { const t = oneOf([11,12]), n = ri(2,12); return { q: `${n} × ${t}`, a: n*t }; },
-    () => { const a = ri(320,940), b = ri(110,290); return { q: `${a} − ${b}`, a: a-b }; },
-    () => { const n = ri(120,480); return { q: `Double ${n}`, a: n*2 }; },
+    () => { const [a,b] = mentalGap(10, 3, 9); return { q: `${a} − ${b}`, a: a-b }; },
+    () => { const n = ri(12,48)*10; return { q: `Double ${n}`, a: n*2 }; },
     () => { const t = oneOf([3,4,5]), n = ri(3,9), r = ri(1,t-1);
             return { q: `What is the remainder when ${n*t+r} is divided by ${t}?`, a: r }; },
     () => { const f = oneOf([[2,5],[3,5],[3,4],[5,6]]), n = ri(2,6)*f[1];
@@ -2288,8 +2308,8 @@ const OLDER = [
     () => { const a = ri(3,12), b = ri(3,12); return { q: `${a*b} ÷ ${a}`, a: b }; },
     () => { const n = ri(12,98); return { q: `${n} × 100`, a: n*100 }; },
     () => { const n = ri(12,98); return { q: `${n*100} ÷ 100`, a: n }; },
-    () => { const a = ri(125,899), b = ri(125,899); return { q: `${a} + ${b}`, a: a+b }; },
-    () => { const a = ri(420,960), b = ri(125,395); return { q: `${a} − ${b}`, a: a-b }; },
+    () => { const [a,b] = mentalSum(10, 9, 5, 9); return { q: `${a} + ${b}`, a: a+b }; },
+    () => { const [a,b] = mentalGap(10, 3, 9); return { q: `${a} − ${b}`, a: a-b }; },
     () => { const b = ri(3,9), n = ri(20,90);
             return { q: `What is the remainder when ${n} is divided by ${b}?`, a: n%b }; },
     () => { const p = oneOf([25,50]), n = oneOf([40,60,80,120,160,200,240]);
@@ -2305,8 +2325,8 @@ const OLDER = [
   ],
   [ /* on a roll */
     () => { const a = ri(13,29), b = ri(3,9); return { q: `${a} × ${b}`, a: a*b }; },
-    () => { const a = ri(1250,8900), b = ri(1250,8900); return { q: `${a} + ${b}`, a: a+b }; },
-    () => { const a = ri(4200,9600), b = ri(1250,3950); return { q: `${a} − ${b}`, a: a-b }; },
+    () => { const [a,b] = mentalSum(100, 9, 5, 8); return { q: `${a} + ${b}`, a: a+b }; },
+    () => { const [a,b] = mentalGap(100, 3, 9); return { q: `${a} − ${b}`, a: a-b }; },
     () => { const n = ri(12,98); return { q: `${n*1000} ÷ 1000`, a: n }; },
     () => { const f = oneOf(frac), m = f[1]*ri(3,12);
             return { q: `${f[0]}/${f[1]} of ${m}`, a: f[0]*m/f[1] }; },
@@ -2335,7 +2355,9 @@ const OLDER = [
             return { q: `How many ${u[1]} are there in ${n} ${u[0]}?`, a: Math.round(n*u[2]) }; }
   ],
   [ /* the hard end */
-    () => { const a = ri(12,29), b = ri(12,29); return { q: `${a} × ${b}`, a: a*b }; },
+    () => { const n = ri(12,29), t = oneOf([11,20,30,40,50]);   /* the mental ones: a
+               round ten to partition, or the elevens, which have a trick to them */
+            return { q: `${n} × ${t}`, a: n*t }; },
     () => { const d = ri(3,9), w = ri(2,6), n = ri(1,d-1);
             return { q: `How many whole ones are there in ${w*d+n}/${d}?`, a: w }; },
     () => { const f = oneOf(frac), k = ri(2,5);
@@ -2347,12 +2369,18 @@ const OLDER = [
             return { q: `${p}% of ${n}`, a: p*n/100 }; },
     () => { const d = oneOf([3,4,5,8,10]), n = ri(1,d-1), k = ri(2,5);
             return { q: `${n}/${d} × ${k} = ?/${d}`, a: n*k }; },
-    () => { const a = ri(60,110), b = ri(60,110), c = ri(40,100);
-            return { q: `Angles around a point add up to 360°. Three are ${a}°, ${b}° and ${c}°. What is the fourth?`,
-                     a: 360-a-b-c }; },
-    () => { const a = ri(101,899)/1000, b = ri(1,9)/10;
-            return { q: `${a} + ${b}`, a: +(a+b).toFixed(3) }; },
-    () => { const h1 = ri(7,14), m1 = ri(0,11)*5, mins = oneOf([25,35,40,45,50,55,70,80,95,100]);
+    () => { /* built from the answer outwards, in whole tens, so the three add up in
+               the head and the take-away is off a round number */
+            const want = ri(4,12)*10, left = (360-want)/10;
+            const a = ri(4, left-8), b = ri(4, left-a-4), c = left-a-b;
+            return { q: `Angles around a point add up to 360°. Three are ${a*10}°, ${b*10}° and ${c*10}°. What is the fourth?`,
+                     a: want }; },
+    () => { /* tenths, and made to cross a whole one, which is the part worth having */
+            const a = ri(11,89)/10, b = ri(1,9)/10;
+            return { q: `${a.toFixed(1)} + ${b.toFixed(1)}`, a: +(a+b).toFixed(1) }; },
+    () => { const h1 = ri(7,14), m1 = ri(0,11)*5, mins = oneOf([20,25,35,40,45,50,55,70]);   /* counting up
+                                          to the hour and on: past about an hour and
+                                          a quarter it stops being a quick one */
             const t = h1*60 + m1 + mins;
             return { q: `How many minutes are there between ${pad2(h1)}:${pad2(m1)} and ${pad2((t/60)|0)}:${pad2(t%60)}?`,
                      a: mins }; },

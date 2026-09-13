@@ -116,10 +116,22 @@ each time the game is opened.
 
 Every question is generated rather than drawn from a list, so the same one does not
 come round twice in an evening, and every answer is a number or one of a few buttons
-— nothing to spell. Nothing typed is ever a negative number either: a phone's
-numeric keypad has no minus sign on it, and a child fighting the keyboard is not
-practising anything. A wrong answer costs a second go and then the answer; it never
-costs the round.
+— nothing to spell. Nothing typed is ever a negative number either: a phone's numeric
+keypad has no minus sign on it, and a child fighting the keyboard is not practising
+anything. A wrong answer costs a second go and then the answer; it never costs the
+round.
+
+And every question can be done in the head. Not by keeping the numbers small — the
+top of Bea's ladder adds thousands — but by keeping the *columns* down: one carry or
+one borrow, never two, because two is where the pen comes out, and a question that
+wants a pen loses the room. So the sums are built column by column rather than drawn
+at random. The lower column is made never to cross and the upper one always to, which
+puts the whole of the difficulty in the one place worth practising: 910 + 240, not
+917 + 246. Anything in the hundreds is round to ten and anything in the thousands
+round to a hundred, long multiplication is gone in favour of round tens and the
+elevens, decimals stop at a tenth, and taking something off a round hundred is
+allowed to count as the one move it really is. There is a check over forty-five
+thousand drawn questions that holds all of that in place.
 
 Behind it is a small rigid-body engine: convex outlines, separating-axis tests
 clipped down to two-point contacts, and impulses that carry across the substeps of
