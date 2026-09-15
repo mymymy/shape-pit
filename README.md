@@ -169,4 +169,38 @@ matter whatever the physics did.
 
 One file, no build step, no dependencies. Open `index.html` anywhere.
 
-Add `?debug=1` to the URL for a handle on the simulation from the console.
+Add `?debug=1` to the URL for a handle on the simulation from the console, and
+`?cheer` for a button in the corner that plays the celebration on demand — one press
+fills a pit and lights it, with no need to guess a count correctly first.
+
+## The tests
+
+The game ships as one file, but there is a `test/` folder beside it that drives the
+real thing in a headless browser. Nothing is mocked: there is nothing here worth
+mocking, and the bugs that have actually reached the girls were all of the kind a
+mock would have hidden — a timer reading a variable that had just been cleared, a
+progress bar animating backwards on a level-up, a shape sitting squarely on top of
+the caption naming it, and an answer box whose keypad had no decimal point on it.
+
+```
+npm install && npx playwright install chromium
+npm test
+```
+
+Three runs, 113 checks:
+
+- **`test/maths.js`** — the chooser, the turns, the two ladders, the levels and the
+  bar, the shapes each level unlocks, the shape coming forward, and a sweep over
+  forty-five thousand generated questions checking every one of them is well formed,
+  typeable and doable in the head.
+- **`test/cheer.js`** — the celebration: that an exact guess lights the pit and a
+  wrong one does not, that it keeps changing for as long as anyone watches, that
+  pressing on ends it, and that the pit is left pixel for pixel as it was.
+- **`test/pit.js`** — the physics, over real dropped rounds: no two pieces sharing a
+  pixel, none through the floor, and how full, how fast and how deep each round got.
+  Takes `width height tag rounds`, so `node test/pit.js 390 740 phone 20` is a long
+  look at a phone-shaped window.
+
+Any of them can be run on its own — `npm run test:pit`. Screenshots land in
+`test/out/`, which is ignored; they are for looking at when something has gone wrong
+rather than for keeping.

@@ -1,0 +1,14 @@
+{
+  "name": "shape-pit",
+  "private": true,
+  "description": "A guessing game: shapes rain in, pile up and settle, and you say how many there are.",
+  "scripts": {
+    "test": "node test/run.js",
+    "test:maths": "node test/maths.js",
+    "test:cheer": "node test/cheer.js",
+    "test:pit": "node test/pit.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}
